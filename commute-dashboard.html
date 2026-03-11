@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Commute · Dashboard</title>
+<script src="config.js"></script>
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Commute">
+<meta name="theme-color" content="#0b0d14" id="theme-color-meta">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,600;0,9..144,700;1,9..144,300&display=swap" rel="stylesheet">
+<style>
+:root {
+  --green:#3ecf7a; --amber:#f5a623; --red:#e85555;
+  --m-bg:#0b0d14; --m-surface:#13151f; --m-surface2:#1a1d2a; --m-border:#252838;
+  --m-text:#dde1f0; --m-muted:#8890b0; --m-accent:#38c8f0; --m-head:#ffffff;
+  --e-bg:#f2ece0; --e-surface:#faf6ee; --e-surface2:#e8e0d0; --e-border:#d8d0be;
+  --e-text:#2a2218; --e-muted:#6b5e4e; --e-accent:#9e3d0e; --e-head:#1a1008;
+  --bg:var(--m-bg); --surface:var(--m-surface); --surface2:var(--m-surface2);
+  --border:var(--m-border); --text:var(--m-text); --muted:var(--m-muted);
+  --accent:var(--m-accent); --head:var(--m-head);
+}
+/* Evening theme — all overrides merged */
+body.evening{--bg:var(--e-bg);--surface:var(--e-surface);--surface2:var(--e-surface2);--border:var(--e-border);--text:var(--e-text);--muted:var(--e-muted);--accent:var(--e-accent);--head:var(--e-head);--green:#1a7a42;--amber:#8a5500;--red:#b02020;}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+html{background:var(--m-bg);}
+html.evening-mode{background:var(--e-bg);}
+body{background:var(--bg);color:var(--text);font-family:'Fraunces',Georgia,serif;min-height:100vh;padding:28px 18px 48px;max-width:500px;margin:0 auto;transition:background 0.5s ease,color 0.5s ease;}
+
+.header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:26px;}
+.eyebrow{font-family:'DM Mono',monospace;font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin-bottom:6px;}
+h1{font-size:28px;font-weight:700;color:var(--head);letter-spacing:-0.02em;line-height:1.1;font-style:italic;}
+h1 em{font-style:normal;color:var(--accent);}
+.header-right{text-align:right;flex-shrink:0;padding-top:2px;}
+.clock-time{font-family:'DM Mono',monospace;font-size:26px;color:var(--head);letter-spacing:-0.02em;line-height:1;}
+.clock-date{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);margin-top:4px;letter-spacing:0.04em;}
+
+.direction-toggle{display:flex;gap:6px;margin-bottom:22px;}
+.toggle-btn{flex:1;padding:11px 10px;border:1px solid var(--border);border-radius:10px;background:var(--surface);color:var(--muted);font-family:'DM Mono',monospace;font-size:12px;letter-spacing:0.04em;cursor:pointer;transition:all 0.25s ease;text-align:center;}
+.toggle-btn.active{background:var(--surface2);color:var(--text);border-color:var(--accent);}
+
+.demo-banner{background:transparent;border:1px dashed var(--border);border-radius:10px;padding:10px 14px;margin-bottom:20px;font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);line-height:1.6;display:flex;align-items:center;gap:8px;}
+.demo-banner span{color:var(--accent);}
+/* FOOTBALL ALERT */
+.football-alert{display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 16px;margin-bottom:18px;animation:fadeUp 0.3s ease both;}
+.football-alert .fa-badge{font-size:22px;flex-shrink:0;line-height:1;}
+.football-alert .fa-body{}
+.football-alert .fa-title{font-size:13px;font-weight:700;color:var(--head);margin-bottom:2px;}
+.football-alert .fa-sub{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);}
+.football-alert.arsenal{border-color:rgba(239,27,36,0.35);background:rgba(239,27,36,0.05);}
+.football-alert.spurs{border-color:rgba(19,34,87,0.3);background:rgba(19,34,87,0.04);}
+body.evening .football-alert.spurs{border-color:rgba(19,34,87,0.25);background:rgba(19,34,87,0.06);}
+
+
+/* BOARD POINT TOGGLE */
+.board-toggle-wrap{margin-bottom:18px;}
+.board-toggle-label{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.board-toggle{display:inline-flex;background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:3px;gap:3px;}
+.board-btn{padding:7px 14px;border:none;border-radius:7px;font-family:'DM Mono',monospace;font-size:12px;cursor:pointer;transition:all 0.2s;background:transparent;color:var(--muted);}
+.board-btn.active{background:var(--surface2);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,0.3);}
+
+/* CONNECTION COUNTDOWN */
+.countdown-box{border-radius:14px;padding:20px;margin-bottom:20px;border:1px solid transparent;animation:fadeUp 0.3s ease both;}
+.countdown-box.makeable{background:rgba(62,207,122,0.07);border-color:rgba(62,207,122,0.3);}
+.countdown-box.tight{background:rgba(245,166,35,0.07);border-color:rgba(245,166,35,0.3);}
+.countdown-box.missed{background:rgba(232,85,85,0.07);border-color:rgba(232,85,85,0.3);}
+.countdown-inner{display:flex;align-items:center;gap:16px;}
+.countdown-timer{flex-shrink:0;text-align:center;}
+.countdown-digits{font-family:'DM Mono',monospace;font-size:42px;font-weight:500;line-height:1;letter-spacing:-0.02em;}
+.countdown-box.makeable .countdown-digits{color:var(--green);}
+.countdown-box.tight .countdown-digits{color:var(--amber);}
+.countdown-box.missed .countdown-digits{color:var(--red);}
+.countdown-unit{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin-top:2px;}
+.countdown-text{}
+.countdown-train{font-size:15px;font-weight:600;color:var(--head);margin-bottom:4px;line-height:1.2;}
+.countdown-sub{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);line-height:1.5;}
+.countdown-verdict{font-family:'DM Mono',monospace;font-size:12px;margin-top:6px;font-weight:500;}
+.countdown-box.makeable .countdown-verdict{color:var(--green);}
+.countdown-box.tight .countdown-verdict{color:var(--amber);}
+.countdown-box.missed .countdown-verdict{color:var(--red);}
+
+/* NEXT TRAINS LIST in countdown */
+.next-trains{margin-top:14px;padding-top:12px;border-top:1px solid var(--border);}
+.next-trains-label{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.train-rows{display:flex;flex-direction:column;gap:5px;}
+.train-row{display:flex;align-items:center;gap:10px;font-family:'DM Mono',monospace;font-size:12px;padding:5px 8px;border-radius:7px;background:var(--surface2);}
+.train-row.makeable-row{border-left:3px solid var(--green);}
+.train-row.tight-row{border-left:3px solid var(--amber);}
+.train-row.missed-row{border-left:3px solid var(--red);opacity:0.6;}
+.train-time{font-weight:500;color:var(--head);min-width:38px;}
+.train-buffer{flex:1;color:var(--muted);}
+.train-verdict{font-size:11px;font-weight:500;}
+.train-row.makeable-row .train-verdict{color:var(--green);}
+.train-row.tight-row .train-verdict{color:var(--amber);}
+.train-row.missed-row .train-verdict{color:var(--red);}
+
+/* RECOMMENDATION */
+.rec-card{border-radius:14px;padding:18px 20px;margin-bottom:20px;position:relative;animation:fadeUp 0.35s ease both;border:1px solid transparent;}
+.rec-card.good{background:rgba(62,207,122,0.08);border-color:rgba(62,207,122,0.25);}
+.rec-card.warn{background:rgba(245,166,35,0.08);border-color:rgba(245,166,35,0.25);}
+.rec-card.bad{background:rgba(232,85,85,0.08);border-color:rgba(232,85,85,0.25);}
+.rec-icon{position:absolute;top:16px;right:18px;font-size:22px;}
+.rec-label{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin-bottom:5px;}
+.rec-headline{font-size:17px;font-weight:600;color:var(--head);line-height:1.25;margin-bottom:4px;padding-right:32px;}
+.rec-reason{font-family:'DM Mono',monospace;font-size:12px;color:var(--muted);line-height:1.5;}
+
+.section-label{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;}
+
+.option-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:18px 18px 16px;margin-bottom:12px;animation:fadeUp 0.4s ease both;transition:border-color 0.3s;position:relative;}
+.option-card.recommended{border-color:var(--green);}
+.rec-badge{position:absolute;top:14px;right:14px;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.06em;color:var(--green);background:rgba(62,207,122,0.12);padding:3px 8px;border-radius:20px;}
+.opt-title{font-size:18px;font-weight:700;color:var(--head);letter-spacing:-0.01em;line-height:1;margin-bottom:3px;}
+.opt-subtitle{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);margin-bottom:14px;}
+
+.status-row{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap;}
+.status-pill{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:20px;font-family:'DM Mono',monospace;font-size:11px;font-weight:500;}
+.status-pill .dot{width:6px;height:6px;border-radius:50%;}
+.pill-good{background:rgba(62,207,122,0.12);color:var(--green);} .pill-good .dot{background:var(--green);}
+.pill-warn{background:rgba(245,166,35,0.12);color:var(--amber);} .pill-warn .dot{background:var(--amber);}
+.pill-bad{background:rgba(232,85,85,0.12);color:var(--red);}     .pill-bad .dot{background:var(--red);}
+
+.disruption{background:rgba(245,166,35,0.07);border:1px solid rgba(245,166,35,0.25);border-radius:10px;padding:10px 13px;margin-bottom:12px;font-family:'DM Mono',monospace;font-size:11px;color:var(--amber);line-height:1.55;}
+.disruption strong,.conn-alert strong,.heads-up strong{display:block;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;opacity:0.7;margin-bottom:3px;}
+.conn-alert{background:rgba(232,85,85,0.07);border:1px solid rgba(232,85,85,0.25);border-radius:10px;padding:10px 13px;margin-bottom:12px;font-family:'DM Mono',monospace;font-size:11px;color:var(--red);line-height:1.55;}
+.heads-up{background:rgba(245,166,35,0.07);border:1px solid rgba(245,166,35,0.25);border-radius:10px;padding:10px 13px;margin-bottom:12px;font-family:'DM Mono',monospace;font-size:11px;color:var(--amber);line-height:1.55;}
+
+.legs{margin-bottom:14px;}
+.leg-row{display:flex;align-items:flex-start;gap:10px;padding:7px 0;}
+.leg-stripe{width:4px;min-height:42px;border-radius:4px;flex-shrink:0;margin-top:2px;}
+.leg-detail{flex:1;}
+.leg-line-name{font-size:13px;font-weight:600;color:var(--text);margin-bottom:2px;display:flex;align-items:center;gap:6px;}
+.line-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+.leg-stations{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);margin-bottom:3px;}
+.leg-station-status{font-family:'DM Mono',monospace;font-size:10px;display:flex;flex-direction:column;gap:2px;}
+.stn-status{display:inline-flex;align-items:center;gap:4px;}
+.stn-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0;}
+.stn-open{color:var(--green);} .stn-open .stn-dot{background:var(--green);}
+.stn-part{color:var(--amber);} .stn-part .stn-dot{background:var(--amber);}
+.stn-closed{color:var(--red);} .stn-closed .stn-dot{background:var(--red);}
+.stn-unknown{color:var(--muted);} .stn-unknown .stn-dot{background:var(--muted);}
+.leg-dur{font-family:'DM Mono',monospace;font-size:14px;font-weight:500;color:var(--text);flex-shrink:0;padding-top:2px;}
+.interchange-row{display:flex;align-items:center;gap:8px;padding:4px 0 4px 14px;font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);}
+.interchange-row::before{content:'⇄';opacity:0.5;}
+
+.dep-label{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.dep-chips{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:14px;}
+.dep-chip{background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:7px 11px;text-align:center;min-width:58px;}
+.dep-chip.next-dep{border-color:var(--accent);background:transparent;}
+.dep-time{font-family:'DM Mono',monospace;font-size:15px;font-weight:500;color:var(--text);line-height:1;}
+.dep-chip.next-dep .dep-time{color:var(--accent);}
+.dep-mins{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);margin-top:2px;}
+.dep-chip.delayed .dep-time{color:var(--amber);}
+.dep-chip.target-dep{border-color:var(--accent);border-width:2px;}
+.dep-chip.target-dep .dep-time{color:var(--accent);}
+.dep-chip.cancelled .dep-time{color:var(--red);text-decoration:line-through;}
+.dep-chip .dep-est{font-family:'DM Mono',monospace;font-size:9px;color:var(--amber);margin-top:1px;}
+
+.stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding-top:13px;border-top:1px solid var(--border);}
+.stat{text-align:center;}
+.stat-val{font-family:'DM Mono',monospace;font-size:20px;color:var(--head);line-height:1;}
+.stat-val sup{font-size:11px;color:var(--muted);vertical-align:super;}
+.stat-lbl{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);margin-top:3px;letter-spacing:0.05em;text-transform:uppercase;}
+.score-bar-bg{height:2px;background:var(--border);border-radius:2px;margin-top:5px;overflow:hidden;}
+.score-bar-fill{height:100%;border-radius:2px;transition:width 0.7s ease;}
+
+.footer{margin-top:28px;display:flex;justify-content:space-between;align-items:center;}
+.last-updated{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);}
+.refresh-btn{display:flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:9px 16px;border-radius:9px;font-family:'DM Mono',monospace;font-size:12px;cursor:pointer;transition:all 0.2s;}
+.refresh-btn:hover{border-color:var(--accent);color:var(--accent);}
+.spin{display:inline-block;transition:transform 0.5s;}
+.refresh-btn:hover .spin{transform:rotate(180deg);}
+
+.loading{text-align:center;padding:40px 0;font-family:'DM Mono',monospace;font-size:13px;color:var(--muted);}
+.loading::after{content:'';display:inline-block;width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.7s linear infinite;margin-left:8px;vertical-align:middle;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
+@keyframes spin{to{transform:rotate(360deg);}}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <div class="eyebrow">Commute · London</div>
+    <h1 id="header-title">To <em>Oxford Circus</em></h1>
+  </div>
+  <div class="header-right">
+    <div class="clock-time" id="clock-time">--:--</div>
+    <div class="clock-date" id="clock-date">---</div>
+  </div>
+</div>
+
+<div class="direction-toggle">
+  <button class="toggle-btn active" id="btn-morning" onclick="setDirection('morning')">↗ To Oxford Circus</button>
+  <button class="toggle-btn" id="btn-evening" onclick="setDirection('evening')">↙ To Home</button>
+</div>
+
+<div class="demo-banner" id="demo-banner">
+  <span>Demo mode</span> — add API keys to config.js for live data
+</div>
+
+<!-- Football alert — injected if there is a home game today -->
+<div id="football-alert-wrap"></div>
+
+<!-- Board point toggle — only shown in evening mode -->
+<div class="board-toggle-wrap" id="board-toggle-wrap" style="display:none;">
+  <div class="board-toggle-label">Boarding from</div>
+  <div class="board-toggle">
+    <button class="board-btn active" id="board-oxc" onclick="setBoardPoint('oxc')">Oxford Circus</button>
+    <button class="board-btn" id="board-wrr" onclick="setBoardPoint('wrr')">Warren Street</button>
+  </div>
+</div>
+
+<div id="dashboard"><div class="loading">Loading</div></div>
+
+<div class="footer">
+  <div class="last-updated">Updated <span id="last-time">—</span></div>
+  <button class="refresh-btn" onclick="refresh()"><span class="spin">↻</span> Refresh</button>
+</div>
+
+<script>
+// ── CONFIG FALLBACK ──────────────────────────────────────────
+if(typeof CONFIG==='undefined'){
+  window.CONFIG={TFL_API_KEY:'',DARWIN_API_KEY:'',FOOTBALL_API_KEY:'',
+    CRS_BOWES_PARK:'BOP',CRS_HIGHBURY:'HHY',
+    EVENING_HOUR:14,CONNECTION_BUFFER_MINS:2,
+    WALK_TO_OXC:5,WALK_TO_WRR:11,
+    MORNING_TARGET_TRAIN:'07:25',REFRESH_INTERVAL_MS:60000};
+}
+
+// ── HELPERS ──────────────────────────────────────────────────
+function nowSecs(){ return Date.now()/1000; }
+
+function hhmmToSecs(hhmm){
+  const[h,m]=hhmm.split(':').map(Number);
+  const now=new Date();
+  const t=new Date(now); t.setHours(h,m,0,0);
+  return t.getTime()/1000;
+}
+
+function secsUntil(hhmm){ return hhmmToSecs(hhmm)-nowSecs(); }
+function minsUntil(hhmm){ return secsUntil(hhmm)/60; }
+
+function minsLabel(m){return m<=0?'due':m===1?'1 min':`${m} min`;}
+function scoreColor(s){return s>=75?'var(--green)':s>=50?'var(--amber)':'var(--red)';}
+
+function addMins(add){
+  const now=new Date();
+  const tot=now.getHours()*60+now.getMinutes()+add;
+  return `${String(Math.floor(tot/60)%24).padStart(2,'0')}:${String(tot%60).padStart(2,'0')}`;
+}
+
+function fmtSecs(totalSecs){
+  const s=Math.max(0,Math.round(totalSecs));
+  const m=Math.floor(s/60), sec=s%60;
+  if(m>=60){ const h=Math.floor(m/60); return `${h}h ${m%60}m`; }
+  if(m>0) return `${m}m ${String(sec).padStart(2,'0')}s`;
+  return `${sec}s`;
+}
+
+// ── TFL API ──────────────────────────────────────────────────
+const TFL_BASE='https://api.tfl.gov.uk';
+const isLive=()=>!!CONFIG.TFL_API_KEY;
+const isDarwinLive=()=>!!CONFIG.DARWIN_API_KEY;
+const isAnyLive=()=>isLive()||isDarwinLive();
+
+function tflUrl(path){
+  const sep=path.includes('?')?'&':'?';
+  return CONFIG.TFL_API_KEY?`${TFL_BASE}${path}${sep}app_key=${CONFIG.TFL_API_KEY}`:`${TFL_BASE}${path}`;
+}
+
+async function fetchLineStatus(lineId){
+  const r=await fetch(tflUrl(`/Line/${lineId}/Status`));
+  const d=await r.json();
+  const statuses=d[0]?.lineStatuses||[];
+  const bad=statuses.find(s=>s.statusSeverity!==10);
+  return{ok:!bad,text:bad?bad.statusSeverityDescription:'Good service',reason:bad?.reason||null};
+}
+
+async function fetchArrivals(naptanId,lineId){
+  const path=lineId?`/StopPoint/${naptanId}/Arrivals?lineIds=${lineId}`:`/StopPoint/${naptanId}/Arrivals`;
+  const r=await fetch(tflUrl(path));
+  const arr=await r.json();
+  return arr
+    .filter(a=>!lineId||a.lineId===lineId)
+    .sort((a,b)=>a.timeToStation-b.timeToStation)
+    .slice(0,5)
+    .map(a=>{
+      const mins=Math.round(a.timeToStation/60);
+      const t=new Date(Date.now()+a.timeToStation*1000);
+      const hhmm=`${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}`;
+      return{time:hhmm,mins:minsLabel(Math.max(0,mins)),minsRaw:mins,delayed:false,secsUntil:a.timeToStation};
+    });
+}
+
+async function fetchStationStatus(naptanId){
+  if(!isLive()) return 'unknown';
+  try{
+    const r=await fetch(tflUrl(`/StopPoint/${naptanId}`));
+    const d=await r.json();
+    const props=d.additionalProperties||[];
+    const closedProp=props.find(p=>p.key==='Closed');
+    if(closedProp&&closedProp.value==='True') return 'closed';
+    const disruptions=d.disruptions||[];
+    if(disruptions.length>0) return 'partClosed';
+    return 'open';
+  }catch(e){return 'unknown';}
+}
+
+async function fetchStationStatuses(naptanIds){
+  const results=await Promise.all(naptanIds.map(id=>fetchStationStatus(id)));
+  const map={};naptanIds.forEach((id,i)=>map[id]=results[i]);
+  return map;
+}
+
+// ── NATIONAL RAIL — raildata.org.uk LDBWS ───────────────────
+const RAILDATA_BASE='https://api1.raildata.org.uk/1010-live-departure-board-dep1_2/LDBWS/api/20220120';
+
+async function fetchDarwinDepartures(crs,numRows=5){
+  if(!isDarwinLive()) return null;
+  try{
+    const url=`${RAILDATA_BASE}/GetDepBoardWithDetails/${crs}?numRows=${numRows}`;
+    const r=await fetch(url,{headers:{'x-apikey':CONFIG.DARWIN_API_KEY}});
+    if(!r.ok) throw new Error(`RailData HTTP ${r.status}`);
+    const data=await r.json();
+    const services=data.trainServices||[];
+    return services.slice(0,numRows).map(s=>{
+      const scheduled=s.std||s.sta||'--:--';
+      const estimated=s.etd||s.eta||'On time';
+      const isDelayed=estimated!=='On time'&&estimated!=='Starts Here'&&estimated!=='Delayed'&&estimated!==scheduled;
+      const isCancelled=estimated==='Cancelled'||!!s.cancelReason;
+      const secsTil=secsUntil(scheduled);
+      return{time:scheduled,mins:minsLabel(Math.max(0,Math.round(secsTil/60))),
+        minsRaw:Math.round(secsTil/60),secsUntil:secsTil,
+        delayed:isDelayed,estimated:isDelayed?estimated:null,
+        cancelled:isCancelled,cancelReason:s.cancelReason||null,
+        platform:s.platform||null,destination:s.destination?.[0]?.locationName||''};
+    });
+  }catch(e){console.warn('RailData fetch failed:',e);return null;}
+}
+
+async function fetchDarwinServiceStatus(crs){
+  const deps=await fetchDarwinDepartures(crs,6);
+  if(!deps) return{ok:true,text:'On time',reason:null};
+  const cancelled=deps.filter(d=>d.cancelled);
+  const delayed=deps.filter(d=>d.delayed);
+  if(cancelled.length>0) return{ok:false,text:'Cancellations',reason:cancelled[0].cancelReason||'Some services cancelled.'};
+  if(delayed.length>=2) return{ok:false,text:'Delays',reason:`${delayed.length} of the next departures are showing delays.`};
+  return{ok:true,text:'On time',reason:null};
+}
+
+// ── STOP IDs ─────────────────────────────────────────────────
+const STOPS={
+  boundsGreen:'940GZZLUBND',  highburyTube:'940GZZLUHAI',
+  oxfordCircus:'940GZZLUOXC', warrenStreet:'940GZZLUWRR',
+  finsburyPark:'940GZZLUFPK', bowesPark:'910GBOP', highburyRail:'910GHHY',
+};
+
+// ride time (mins) from each board point to Highbury & Islington
+const RIDE_TO_HAI={ oxc:8, wrr:6 };   // tube ride mins to H&I
+const WALK_TO_STN={ oxc:CONFIG.WALK_TO_OXC||5, wrr:CONFIG.WALK_TO_WRR||11 };  // from config.js
+const WALK_AT_HAI=2; // platform change buffer at H&I
+
+
+// ── FOOTBALL FIXTURES ────────────────────────────────────────
+// Team IDs on football-data.org: Arsenal=57, Spurs=73
+const FOOTBALL_TEAMS={
+  57:{name:'Arsenal',emoji:'🔴',cls:'arsenal',lines:['Piccadilly line (Arsenal station nearby)']},
+  73:{name:'Spurs',  emoji:'⚪',cls:'spurs',  lines:['Victoria line (Seven Sisters)']},
+};
+
+async function fetchTodayFixtures(){
+  if(!CONFIG.FOOTBALL_API_KEY) return fetchMockFixtures();
+  try{
+    const today=new Date().toISOString().split('T')[0];
+    const teamIds=Object.keys(FOOTBALL_TEAMS).join(',');
+    // football-data.org: get today's PL matches for our two teams
+    const results=await Promise.all(Object.keys(FOOTBALL_TEAMS).map(async tid=>{
+      const r=await fetch(`https://api.football-data.org/v4/teams/${tid}/matches?dateFrom=${today}&dateTo=${today}&status=SCHEDULED,TIMED`,{
+        headers:{'X-Auth-Token':CONFIG.FOOTBALL_API_KEY}
+      });
+      if(!r.ok) return null;
+      const d=await r.json();
+      return{teamId:Number(tid), matches:d.matches||[]};
+    }));
+    const games=[];
+    results.forEach(res=>{
+      if(!res) return;
+      res.matches.forEach(m=>{
+        // Only home games
+        if(m.homeTeam?.id===res.teamId){
+          const ko=new Date(m.utcDate);
+          const hh=String(ko.getHours()).padStart(2,'0');
+          const mm=String(ko.getMinutes()).padStart(2,'0');
+          games.push({teamId:res.teamId,kickoff:`${hh}:${mm}`,opponent:m.awayTeam?.shortName||m.awayTeam?.name||'Unknown'});
+        }
+      });
+    });
+    return games;
+  }catch(e){
+    console.warn('Football API error:',e);
+    return [];
+  }
+}
+
+function fetchMockFixtures(){
+  // In demo mode: show a mock Arsenal home game so the badge is visible
+  const now=new Date();
+  // Only show in evening demo mode so it feels realistic
+  if(now.getHours()>=14){
+    return [{teamId:57,kickoff:'19:30',opponent:'Man City'}];
+  }
+  return [];
+}
+
+function renderFootballAlerts(games){
+  const wrap=document.getElementById('football-alert-wrap');
+  if(!wrap) return;
+  if(!games||games.length===0){wrap.innerHTML='';return;}
+  wrap.innerHTML=games.map(g=>{
+    const team=FOOTBALL_TEAMS[g.teamId];
+    return `<div class="football-alert ${team.cls}">
+      <div class="fa-badge">${team.emoji}⚽</div>
+      <div class="fa-body">
+        <div class="fa-title">${team.name} home game tonight</div>
+        <div class="fa-sub">vs ${g.opponent} · Kick-off ${g.kickoff} · Expect crowds on ${team.lines[0]}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// Fetch fixtures once on load and cache
+let cachedFixtures=null;
+async function getFixtures(){
+  if(cachedFixtures!==null) return cachedFixtures;
+  cachedFixtures=await fetchTodayFixtures();
+  return cachedFixtures;
+}
+
+// ── MOCK DATA ────────────────────────────────────────────────
+const MOCK_STN={ [STOPS.boundsGreen]:'open',[STOPS.highburyTube]:'open',
+  [STOPS.oxfordCircus]:'open',[STOPS.warrenStreet]:'open',[STOPS.finsburyPark]:'open' };
+
+function mockDep(offsetMins,delayed=false){
+  const t=addMins(offsetMins);
+  const s=secsUntil(t);
+  return{time:t,mins:minsLabel(Math.max(0,Math.round(s/60))),minsRaw:Math.round(s/60),secsUntil:s,delayed};
+}
+
+const MOCK={
+  morning:{
+    piccadillyStatus:{ok:true,text:'Good service',reason:null},
+    victoriaStatus:{ok:true,text:'Good service',reason:null},
+    trainStatus:{ok:true,text:'On time',reason:null},
+    piccadillyDeps:[mockDep(3),mockDep(8),mockDep(13),mockDep(18)],
+    trainDeps:['07:10','07:25','07:40','07:55','08:10'].map(t=>({
+      time:t,mins:minsLabel(Math.max(0,Math.round(secsUntil(t)/60))),
+      minsRaw:Math.round(secsUntil(t)/60),secsUntil:secsUntil(t),delayed:false
+    })),
+    stationStatus:MOCK_STN,
+  },
+  evening:{
+    piccadillyStatus:{ok:false,text:'Minor delays',reason:'Minor delays due to a faulty train at Caledonian Road. Expect 5–10 min added journey time.'},
+    victoriaStatus:{ok:true,text:'Good service',reason:null},
+    trainStatus:{ok:true,text:'On time',reason:null},
+    victoriaDepsFP:[mockDep(4),mockDep(9),mockDep(16),mockDep(22)],
+    victoriaWrr:[mockDep(6),mockDep(11),mockDep(18),mockDep(24)],
+    // Mock trains from H&I — spaced so connection logic is interesting
+    trainDepsHAI:[mockDep(14),mockDep(29),mockDep(44),mockDep(59)],
+    stationStatus:{...MOCK_STN,[STOPS.oxfordCircus]:'open'},
+  },
+};
+
+// ── DATA FETCHING ────────────────────────────────────────────
+async function fetchMorningData(){
+  const tflReady=isLive(), darwinReady=isDarwinLive();
+  if(!tflReady&&!darwinReady) return MOCK.morning;
+  try{
+    const stationIds=[STOPS.boundsGreen,STOPS.highburyTube,STOPS.oxfordCircus];
+    const[piccStatus,vicStatus,piccDeps,darwinDeps,darwinStatus,stnStatuses]=await Promise.all([
+      tflReady?fetchLineStatus('piccadilly'):Promise.resolve(MOCK.morning.piccadillyStatus),
+      tflReady?fetchLineStatus('victoria'):Promise.resolve(MOCK.morning.victoriaStatus),
+      tflReady?fetchArrivals(STOPS.boundsGreen,'piccadilly'):Promise.resolve(MOCK.morning.piccadillyDeps),
+      darwinReady?fetchDarwinDepartures(CONFIG.CRS_BOWES_PARK):Promise.resolve(null),
+      darwinReady?fetchDarwinServiceStatus(CONFIG.CRS_BOWES_PARK):Promise.resolve(MOCK.morning.trainStatus),
+      tflReady?fetchStationStatuses(stationIds):Promise.resolve(MOCK.morning.stationStatus),
+    ]);
+    return{piccadillyStatus:piccStatus,victoriaStatus:vicStatus,trainStatus:darwinStatus,
+      piccadillyDeps:piccDeps,trainDeps:darwinDeps||MOCK.morning.trainDeps,stationStatus:stnStatuses};
+  }catch(e){console.warn('Fetch error',e);return MOCK.morning;}
+}
+
+async function fetchEveningData(){
+  const tflReady=isLive(), darwinReady=isDarwinLive();
+  if(!tflReady&&!darwinReady) return MOCK.evening;
+  try{
+    const stationIds=[STOPS.oxfordCircus,STOPS.warrenStreet,STOPS.highburyTube,STOPS.finsburyPark];
+    const[piccStatus,vicStatus,vicDepsFP,vicDepsWrr,darwinDeps,darwinStatus,stnStatuses]=await Promise.all([
+      tflReady?fetchLineStatus('piccadilly'):Promise.resolve(MOCK.evening.piccadillyStatus),
+      tflReady?fetchLineStatus('victoria'):Promise.resolve(MOCK.evening.victoriaStatus),
+      tflReady?fetchArrivals(STOPS.finsburyPark,'victoria'):Promise.resolve(MOCK.evening.victoriaDepsFP),
+      tflReady?fetchArrivals(STOPS.warrenStreet,'victoria'):Promise.resolve(MOCK.evening.victoriaWrr),
+      darwinReady?fetchDarwinDepartures(CONFIG.CRS_HIGHBURY):Promise.resolve(null),
+      darwinReady?fetchDarwinServiceStatus(CONFIG.CRS_HIGHBURY):Promise.resolve(MOCK.evening.trainStatus),
+      tflReady?fetchStationStatuses(stationIds):Promise.resolve(MOCK.evening.stationStatus),
+    ]);
+    return{piccadillyStatus:piccStatus,victoriaStatus:vicStatus,trainStatus:darwinStatus,
+      victoriaDepsFP:vicDepsFP,victoriaWrr:vicDepsWrr,
+      trainDepsHAI:darwinDeps||MOCK.evening.trainDepsHAI,stationStatus:stnStatuses};
+  }catch(e){console.warn('Fetch error',e);return MOCK.evening;}
+}
+
+// ── CONNECTION LOGIC ─────────────────────────────────────────
+// For each upcoming train from H&I, compute whether she can make it
+// given ride time from her board point + walk at H&I.
+// Returns array of {train, bufferSecs, canMake}
+function analyseConnections(trainDepsHAI, boardPoint){
+  const rideMins=RIDE_TO_HAI[boardPoint]||8;
+  const walkToStnMins=WALK_TO_STN[boardPoint]||5;
+  const totalTravelSecs=(walkToStnMins+rideMins+WALK_AT_HAI)*60;
+  const buf=CONFIG.CONNECTION_BUFFER_MINS*60; // minimum buffer in secs
+
+  return (trainDepsHAI||[]).map(train=>{
+    // How many secs from NOW until this train leaves H&I
+    const trainSecsTil=train.secsUntil>0?train.secsUntil:secsUntil(train.time);
+    // Buffer = time until train - travel time to get there
+    const bufferSecs=trainSecsTil-totalTravelSecs;
+    const canMake=bufferSecs>=buf;
+    const tight=bufferSecs>=0&&bufferSecs<buf;
+    return{train,bufferSecs,canMake,tight,trainSecsTil};
+  });
+}
+
+// ── RECOMMENDATION LOGIC ─────────────────────────────────────
+function morningRec(data){
+  const{piccadillyStatus,victoriaStatus,trainStatus}=data;
+  const tubeOk=piccadillyStatus.ok&&victoriaStatus.ok;
+  const trainOk=trainStatus?.ok!==false;
+  if(!tubeOk&&trainOk) return{option:'train',level:'warn',headline:'Take the train from Bowes Park',reason:piccadillyStatus.reason||`Piccadilly line: ${piccadillyStatus.text}`};
+  if(tubeOk&&!trainOk) return{option:'tube',level:'warn',headline:'Take the Tube from Bounds Green',reason:trainStatus?.reason||`Train: ${trainStatus?.text}`};
+  if(!tubeOk&&!trainOk) return{option:'tube',level:'bad',headline:'Both options disrupted',reason:'Check current service status before travelling.'};
+  return{option:'tube',level:'good',headline:'Take the Tube from Bounds Green',reason:'All services running well — Tube is slightly faster today.'};
+}
+
+function eveningRec(data,boardPoint){
+  const{piccadillyStatus,victoriaStatus,trainStatus,trainDepsHAI,stationStatus}=data;
+  const connections=analyseConnections(trainDepsHAI,boardPoint);
+  const bestConn=connections.find(c=>c.canMake);
+  const trainOk=trainStatus?.ok!==false;
+  const oxStatus=stationStatus?.[STOPS.oxfordCircus]||'unknown';
+  const oxClosed=oxStatus==='closed';
+  const oxBusy=oxStatus==='partClosed';
+
+  if(oxClosed) return{option:'warren',level:'bad',
+    headline:'Oxford Circus closed — board at Warren Street',
+    reason:'Oxford Circus station is unavailable. Walk to Warren Street instead.'};
+
+  if(bestConn&&trainOk){
+    const bufMins=Math.round(bestConn.bufferSecs/60);
+    const prefix=oxBusy?'Oxford Circus is busy — consider Warren Street. Either way, c':'C';
+    return{option:'train',level:oxBusy?'warn':'good',
+      headline:'Catch the train from Highbury & Islington',
+      reason:`${prefix}atch the ${bestConn.train.time} train — ${bufMins} min to spare at H&I.`};
+  }
+  if(!trainOk) return{option:'finsbury',level:'warn',
+    headline:'Stay on the tube to Finsbury Park',
+    reason:trainStatus?.reason||`Train disruption: ${trainStatus?.text}`};
+  return{option:'finsbury',level:'warn',
+    headline:'Stay on the tube to Finsbury Park',
+    reason:`No makeable train connection from H&I right now. Stay on tube to Finsbury Park.`};
+}
+
+// ── RENDER HELPERS ───────────────────────────────────────────
+function stnStatusHtml(naptanId,name,stationStatus){
+  const s=stationStatus?.[naptanId]||'unknown';
+  const cls=s==='open'?'stn-open':s==='partClosed'?'stn-part':s==='closed'?'stn-closed':'stn-unknown';
+  const label=s==='open'?'Open':s==='partClosed'?'Part closed':s==='closed'?'Closed':'Status unknown';
+  return `<span class="stn-status ${cls}"><span class="stn-dot"></span>${name}: ${label}</span>`;
+}
+
+function rLeg(color,lineName,from,fromId,to,toId,dur,stationStatus){
+  const fromSt=fromId?stnStatusHtml(fromId,from,stationStatus):'';
+  const toSt=toId?stnStatusHtml(toId,to,stationStatus):'';
+  return `<div class="leg-row">
+    <div class="leg-stripe" style="background:${color}"></div>
+    <div class="leg-detail">
+      <div class="leg-line-name"><span class="line-dot" style="background:${color}"></span>${lineName}</div>
+      <div class="leg-stations">${from} → ${to}</div>
+      <div class="leg-station-status">${fromSt}${toSt}</div>
+    </div>
+    <div class="leg-dur">${dur}</div>
+  </div>`;
+}
+function rChange(txt){return `<div class="interchange-row">${txt}</div>`;}
+function rDeps(deps,label,targetTime){
+  if(!deps?.length) return `<div class="dep-label">${label}</div><div class="dep-chips"><span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">No data</span></div>`;
+  return `<div class="dep-label">${label}</div><div class="dep-chips">`+
+    deps.map((d,i)=>{
+      const isNext=i===0;
+      const isTarget=targetTime&&d.time===targetTime;
+      return `<div class="dep-chip ${isNext?'next-dep':''} ${isTarget?'target-dep':''} ${d.delayed?'delayed':''} ${d.cancelled?'cancelled':''}">
+        <div class="dep-time">${d.time}</div>
+        <div class="dep-mins">${d.cancelled?'Cancelled':d.mins}</div>
+        ${isTarget?`<div class="dep-est" style="color:var(--accent)">Target</div>`:''}
+        ${d.delayed&&d.estimated?`<div class="dep-est">Exp ${d.estimated}</div>`:''}
+      </div>`;
+    }).join('')+`</div>`;
+}
+function rStats(total,wait,score){
+  const c=scoreColor(score);
+  return `<div class="stats-row">
+    <div class="stat"><div class="stat-val">${total}<sup>m</sup></div><div class="stat-lbl">Total</div></div>
+    <div class="stat"><div class="stat-val">${wait}<sup>m</sup></div><div class="stat-lbl">Wait</div></div>
+    <div class="stat"><div class="stat-val" style="color:${c}">${score}</div><div class="stat-lbl">Score</div>
+      <div class="score-bar-bg"><div class="score-bar-fill" style="width:${score}%;background:${c}"></div></div>
+    </div>
+  </div>`;
+}
+function rStatus(statuses){
+  return `<div class="status-row">`+statuses.map(s=>{
+    const cls=s.ok?'pill-good':s.text.toLowerCase().includes('suspend')?'pill-bad':'pill-warn';
+    return `<span class="status-pill ${cls}"><span class="dot"></span>${s.label}: ${s.text}</span>`;
+  }).join('')+`</div>`;
+}
+function rRec(rec){
+  return `<div class="rec-card ${rec.level}">
+    <div class="rec-icon">${rec.level==='good'?'🟢':rec.level==='warn'?'🟡':'🔴'}</div>
+    <div class="rec-label">Suggestion</div>
+    <div class="rec-headline">${rec.headline}</div>
+    <div class="rec-reason">${rec.reason}</div>
+  </div>`;
+}
+
+// ── CONNECTION COUNTDOWN BLOCK ───────────────────────────────
+// Renders the live countdown widget and stores state for ticking
+let countdownInterval=null;
+let countdownState=null; // {connections, boardPoint}
+
+function renderCountdownBox(connections, boardPoint){
+  const rideMins=RIDE_TO_HAI[boardPoint]||8;
+  const buf=CONFIG.CONNECTION_BUFFER_MINS;
+  const bestConn=connections.find(c=>c.canMake);
+  const nextConn=connections[0];
+
+  // Determine which train to count down to
+  const targetConn=bestConn||nextConn;
+  if(!targetConn) return '<div class="countdown-box missed"><div class="countdown-inner"><div class="countdown-text"><div class="countdown-train">No upcoming trains</div></div></div></div>';
+
+  const bufSecs=targetConn.bufferSecs;
+  const cls=targetConn.canMake?(bufSecs>5*60?'makeable':'tight'):'missed';
+  const verdict=targetConn.canMake
+    ?(bufSecs>5*60?`✓ You'll make it`:`⚠ Tight — leave now`)
+    :`✗ Too late for this train`;
+
+  // Build the per-train rows
+  const trainRows=connections.slice(0,4).map(c=>{
+    const rowCls=c.canMake?(c.bufferSecs>5*60?'makeable-row':'tight-row'):'missed-row';
+    const bufMin=Math.round(c.bufferSecs/60);
+    const bufLabel=c.bufferSecs>=0?`${bufMin}m buffer`:`${Math.abs(bufMin)}m too late`;
+    const v=c.canMake?(c.bufferSecs>5*60?'✓ Makeable':'⚠ Tight'):'✗ Missed';
+    return `<div class="train-row ${rowCls}">
+      <span class="train-time">${c.train.time}</span>
+      <span class="train-buffer">${bufLabel} after ${WALK_TO_STN[boardPoint]||5}m walk + ${rideMins}m ride + ${buf}m platform change</span>
+      <span class="train-verdict">${v}</span>
+    </div>`;
+  }).join('');
+
+  return `<div class="countdown-box ${cls}" id="countdown-box">
+    <div class="countdown-inner">
+      <div class="countdown-timer">
+        <div class="countdown-digits" id="countdown-digits">--:--</div>
+        <div class="countdown-unit">to leave now</div>
+      </div>
+      <div class="countdown-text">
+        <div class="countdown-train">${targetConn.train.time} train from H&amp;I</div>
+        <div class="countdown-sub">Board at ${boardPoint==='wrr'?'Warren Street':'Oxford Circus'} · ${WALK_TO_STN[boardPoint]}m walk + ${rideMins}m ride + ${buf}m platform change</div>
+        <div class="countdown-verdict" id="countdown-verdict">${verdict}</div>
+      </div>
+    </div>
+    <div class="next-trains">
+      <div class="next-trains-label">All upcoming trains from Highbury &amp; Islington</div>
+      <div class="train-rows">${trainRows}</div>
+    </div>
+  </div>`;
+}
+
+function startCountdownTick(connections, boardPoint){
+  if(countdownInterval) clearInterval(countdownInterval);
+  countdownState={connections,boardPoint};
+
+  function tick(){
+    const el=document.getElementById('countdown-digits');
+    const ve=document.getElementById('countdown-verdict');
+    const box=document.getElementById('countdown-box');
+    if(!el) return;
+
+    const rideMins=RIDE_TO_HAI[boardPoint]||8;
+    const buf=CONFIG.CONNECTION_BUFFER_MINS*60;
+
+    // Recompute live buffer for each connection
+    const live=connections.map(c=>{
+      const trainSecsTil=secsUntil(c.train.time);
+      const walkToStnMins=WALK_TO_STN[boardPoint]||5;
+    const totalTravelSecs=(walkToStnMins+rideMins+CONFIG.CONNECTION_BUFFER_MINS)*60;
+      const bufferSecs=trainSecsTil-totalTravelSecs;
+      return{...c,bufferSecs,canMake:bufferSecs>=0,trainSecsTil};
+    });
+
+    const bestConn=live.find(c=>c.canMake);
+    const target=bestConn||live[0];
+    if(!target) return;
+
+    // Time to leave NOW = train departs - ride - walk (no extra buffer, that's the minimum)
+    const rideSecs=(rideMins+CONFIG.CONNECTION_BUFFER_MINS)*60;
+    const secsToLeave=target.trainSecsTil-rideSecs;
+    el.textContent=fmtSecs(Math.max(0,secsToLeave));
+
+    // Update verdict
+    const cls=target.canMake?(target.bufferSecs>5*60?'makeable':'tight'):'missed';
+    box.className=`countdown-box ${cls}`;
+    if(ve){
+      ve.textContent=target.canMake
+        ?(target.bufferSecs>5*60?`✓ You'll make it with ${Math.round(target.bufferSecs/60)}m to spare`:`⚠ Tight — leave now`)
+        :`✗ Too late — wait for next train`;
+    }
+  }
+
+  tick();
+  countdownInterval=setInterval(tick,1000);
+}
+
+// ── MORNING RENDER ───────────────────────────────────────────
+function renderMorning(data){
+  if(countdownInterval){clearInterval(countdownInterval);countdownInterval=null;}
+  const rec=morningRec(data);
+  const{piccadillyStatus,victoriaStatus,trainStatus,piccadillyDeps,trainDeps,stationStatus}=data;
+  const tubeScore=Math.min(95,(piccadillyStatus.ok?50:15)+(victoriaStatus.ok?38:10)+7);
+  const trainScore=Math.min(95,(trainStatus?.ok!==false?55:20)+(victoriaStatus.ok?38:10)+2);
+  getFixtures().then(renderFootballAlerts);
+  let html=rRec(rec)+`<div class="section-label">Your options</div>`;
+
+  const tubeRec=rec.option==='tube';
+  html+=`<div class="option-card ${tubeRec?'recommended':''}">
+    ${tubeRec?'<div class="rec-badge">✓ Recommended</div>':''}
+    <div class="opt-title">Tube</div>
+    <div class="opt-subtitle">Bounds Green → Oxford Circus</div>`;
+  html+=rStatus([{label:'Piccadilly',ok:piccadillyStatus.ok,text:piccadillyStatus.text},{label:'Victoria',ok:victoriaStatus.ok,text:victoriaStatus.text}]);
+  if(!piccadillyStatus.ok&&piccadillyStatus.reason) html+=`<div class="disruption"><strong>⚠ Disruption</strong>${piccadillyStatus.reason}</div>`;
+  html+=`<div class="legs">
+    ${rLeg('#4a7fff','Piccadilly line','Bounds Green',STOPS.boundsGreen,'Highbury & Isl.',STOPS.highburyTube,'14 min',stationStatus)}
+    ${rChange('Change at Highbury & Islington')}
+    ${rLeg('#38c8f0','Victoria line','Highbury & Isl.',STOPS.highburyTube,'Oxford Circus',STOPS.oxfordCircus,'8 min',stationStatus)}
+  </div>`;
+  html+=rDeps(piccadillyDeps,'Next departures from Bounds Green');
+  html+=rStats(26,3,tubeScore);
+  html+=`</div>`;
+
+  const trainRec=rec.option==='train';
+  const targetMins=Math.round(secsUntil(CONFIG.MORNING_TARGET_TRAIN)/60);
+  html+=`<div class="option-card ${trainRec?'recommended':''}">
+    ${trainRec?'<div class="rec-badge">✓ Recommended</div>':''}
+    <div class="opt-title">Train</div>
+    <div class="opt-subtitle">Bowes Park → Oxford Circus · Target: ${CONFIG.MORNING_TARGET_TRAIN}</div>`;
+  html+=rStatus([{label:'Great Northern',ok:trainStatus?.ok!==false,text:trainStatus?.text||'On time'},{label:'Victoria',ok:victoriaStatus.ok,text:victoriaStatus.text}]);
+  if(trainStatus&&!trainStatus.ok&&trainStatus.reason) html+=`<div class="disruption"><strong>⚠ Disruption</strong>${trainStatus.reason}</div>`;
+  if(targetMins>=0&&targetMins<=12) html+=`<div class="heads-up"><strong>⏱ Heads up</strong>Target ${CONFIG.MORNING_TARGET_TRAIN} train in ${targetMins} min — leave now!</div>`;
+  html+=`<div class="legs">
+    ${rLeg('#f5921e','Great Northern','Bowes Park',null,'Highbury & Isl.',STOPS.highburyTube,'18 min',stationStatus)}
+    ${rChange('Change at Highbury & Islington')}
+    ${rLeg('#38c8f0','Victoria line','Highbury & Isl.',STOPS.highburyTube,'Oxford Circus',STOPS.oxfordCircus,'8 min',stationStatus)}
+  </div>`;
+  html+=rDeps(trainDeps,'Next departures from Bowes Park',CONFIG.MORNING_TARGET_TRAIN);
+  html+=rStats(31,5,trainScore);
+  html+=`</div>`;
+
+  document.getElementById('dashboard').innerHTML=html;
+}
+
+// ── EVENING RENDER ───────────────────────────────────────────
+function renderEvening(data,boardPoint){
+  if(countdownInterval){clearInterval(countdownInterval);countdownInterval=null;}
+  const rec=eveningRec(data,boardPoint);
+  const{piccadillyStatus,victoriaStatus,trainStatus,victoriaDepsFP,victoriaWrr,trainDepsHAI,stationStatus}=data;
+  const connections=analyseConnections(trainDepsHAI,boardPoint);
+  const bestConn=connections.find(c=>c.canMake);
+  const makeable=!!bestConn;
+  const trainScore=makeable&&trainStatus?.ok!==false?(victoriaStatus.ok?85:55):38;
+  const finScore=piccadillyStatus.ok?(victoriaStatus.ok?72:50):32;
+  const oxStatus=stationStatus?.[STOPS.oxfordCircus]||'unknown';
+  const oxBusy=oxStatus==='partClosed', oxClosed=oxStatus==='closed';
+  const boardDeps=boardPoint==='wrr'?victoriaWrr:victoriaDepsFP;
+  const rideMins=RIDE_TO_HAI[boardPoint]||8;
+
+  getFixtures().then(renderFootballAlerts);
+  let html=rRec(rec);
+
+  // ── LIVE CONNECTION COUNTDOWN
+  html+=`<div class="section-label">Connection to H&I train</div>`;
+  html+=renderCountdownBox(connections, boardPoint);
+
+  html+=`<div class="section-label" style="margin-top:20px;">Your options</div>`;
+
+  // ── TRAIN OPTION
+  const trainRec=rec.option==='train'||rec.option==='warren';
+  html+=`<div class="option-card ${trainRec?'recommended':''}">
+    ${trainRec?'<div class="rec-badge">✓ Recommended</div>':''}
+    <div class="opt-title">Train from H&amp;I</div>
+    <div class="opt-subtitle">${boardPoint==='wrr'?'Warren Street':'Oxford Circus'} → Victoria → H&I → Bowes Park</div>`;
+  html+=rStatus([{label:'Victoria',ok:victoriaStatus.ok,text:victoriaStatus.text},{label:'Great Northern',ok:trainStatus?.ok!==false,text:trainStatus?.text||'On time'}]);
+  if(!makeable) html+=`<div class="conn-alert"><strong>⚠ No makeable connection</strong>No upcoming train from H&I allows enough time. Consider Finsbury Park option below.</div>`;
+  if(trainStatus&&!trainStatus.ok&&trainStatus.reason) html+=`<div class="disruption"><strong>⚠ Disruption</strong>${trainStatus.reason}</div>`;
+  if(oxBusy) html+=`<div class="heads-up"><strong>ℹ Oxford Circus busy</strong>Station is part-closed or crowded. You've selected Warren Street as your board point above.</div>`;
+  html+=`<div class="legs">
+    ${rLeg('#38c8f0','Victoria line',boardPoint==='wrr'?'Warren Street':'Oxford Circus',
+      boardPoint==='wrr'?STOPS.warrenStreet:STOPS.oxfordCircus,
+      'Highbury & Isl.',STOPS.highburyTube,`${rideMins} min`,stationStatus)}
+    ${rChange(`Change at Highbury & Islington (~${WALK_AT_HAI} min walk)`)}
+    ${rLeg('#f5921e','Great Northern','Highbury & Isl.',null,'Bowes Park',null,'18 min',stationStatus)}
+  </div>`;
+  html+=rDeps(trainDepsHAI,'Next trains from Highbury & Islington');
+  html+=rStats(30,4,trainScore);
+  html+=`</div>`;
+
+  // ── FINSBURY PARK OPTION
+  const finRec=rec.option==='finsbury';
+  html+=`<div class="option-card ${finRec?'recommended':''}">
+    ${finRec?'<div class="rec-badge">✓ Recommended</div>':''}
+    <div class="opt-title">Tube via Finsbury Park</div>
+    <div class="opt-subtitle">${boardPoint==='wrr'?'Warren Street':'Oxford Circus'} → Victoria → Finsbury Park → Piccadilly → Bounds Green</div>`;
+  html+=rStatus([{label:'Victoria',ok:victoriaStatus.ok,text:victoriaStatus.text},{label:'Piccadilly',ok:piccadillyStatus.ok,text:piccadillyStatus.text}]);
+  if(!piccadillyStatus.ok&&piccadillyStatus.reason) html+=`<div class="disruption"><strong>⚠ Disruption</strong>${piccadillyStatus.reason}</div>`;
+  html+=`<div class="legs">
+    ${rLeg('#38c8f0','Victoria line',boardPoint==='wrr'?'Warren Street':'Oxford Circus',
+      boardPoint==='wrr'?STOPS.warrenStreet:STOPS.oxfordCircus,
+      'Finsbury Park',STOPS.finsburyPark,
+      boardPoint==='wrr'?'9 min':'12 min',stationStatus)}
+    ${rChange('Change at Finsbury Park')}
+    ${rLeg('#4a7fff','Piccadilly line','Finsbury Park',STOPS.finsburyPark,'Bounds Green',STOPS.boundsGreen,'6 min',stationStatus)}
+  </div>`;
+  html+=rDeps(boardDeps,`Next Victoria line trains from ${boardPoint==='wrr'?'Warren Street':'Oxford Circus'}`);
+  html+=rStats(22,3,finScore);
+  html+=`</div>`;
+
+  document.getElementById('dashboard').innerHTML=html;
+
+  // Start the live countdown tick
+  startCountdownTick(connections, boardPoint);
+}
+
+// ── STATE ────────────────────────────────────────────────────
+let direction='morning';
+let boardPoint='oxc'; // 'oxc' | 'wrr'
+let lastEveningData=null;
+
+function setBoardPoint(bp){
+  boardPoint=bp;
+  document.getElementById('board-oxc').classList.toggle('active',bp==='oxc');
+  document.getElementById('board-wrr').classList.toggle('active',bp==='wrr');
+  if(lastEveningData) renderEvening(lastEveningData, boardPoint);
+}
+
+function setDirection(dir){
+  direction=dir;
+  document.body.classList.toggle('evening',dir==='evening');
+  document.documentElement.classList.toggle('evening-mode',dir==='evening');
+  document.getElementById('theme-color-meta').content=dir==='evening'?'#f2ece0':'#0b0d14';
+  document.getElementById('btn-morning').classList.toggle('active',dir==='morning');
+  document.getElementById('btn-evening').classList.toggle('active',dir==='evening');
+  document.getElementById('header-title').innerHTML=dir==='morning'?'To <em>Oxford Circus</em>':'To <em>Home</em>';
+  document.getElementById('demo-banner').style.display=isAnyLive()?'none':'flex';
+  document.getElementById('board-toggle-wrap').style.display=dir==='evening'?'block':'none';
+  loadAndRender();
+}
+
+async function loadAndRender(){
+  document.getElementById('dashboard').innerHTML='<div class="loading">Loading</div>';
+  if(direction==='morning'){
+    const data=await fetchMorningData();
+    renderMorning(data);
+  }else{
+    const data=await fetchEveningData();
+    lastEveningData=data;
+    renderEvening(data,boardPoint);
+  }
+  const now=new Date();
+  document.getElementById('last-time').textContent=`${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+}
+
+function refresh(){loadAndRender();}
+
+function updateClock(){
+  const now=new Date();
+  document.getElementById('clock-time').textContent=`${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+  const days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  document.getElementById('clock-date').textContent=`${days[now.getDay()]} ${now.getDate()} ${months[now.getMonth()]}`;
+}
+
+(function init(){
+  updateClock();
+  setInterval(updateClock,10000);
+  document.getElementById('demo-banner').style.display=isAnyLive()?'none':'flex';
+  if(new Date().getHours()>=CONFIG.EVENING_HOUR){
+    direction='evening';
+    document.body.classList.add('evening');
+  document.documentElement.classList.add('evening-mode');
+    document.getElementById('btn-morning').classList.remove('active');
+    document.getElementById('btn-evening').classList.add('active');
+    document.getElementById('header-title').innerHTML='To <em>Home</em>';
+    document.getElementById('board-toggle-wrap').style.display='block';
+  }
+  setInterval(loadAndRender,CONFIG.REFRESH_INTERVAL_MS);
+  loadAndRender();
+})();
+
+// ── SERVICE WORKER REGISTRATION ──────────────────────────────
+if('serviceWorker' in navigator){
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js')
+      .then(r => console.log('SW registered:', r.scope))
+      .catch(e => console.warn('SW failed:', e));
+  });
+}
+</script>
+</body>
+</html>
