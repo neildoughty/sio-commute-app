@@ -798,7 +798,7 @@ function renderMorning(data){
   const trainRec=rec.option==='train';
 
   // Check if the target train is cancelled
-  const targetTrain=trainDeps.find(d=>d.time===CONFIG.MORNING_TARGET_TRAIN);
+  const targetTrain=(trainDeps||[]).find(d=>d.time===CONFIG.MORNING_TARGET_TRAIN);
   const targetCancelled=targetTrain?.cancelled;
   const targetMins=Math.round(secsUntil(CONFIG.MORNING_TARGET_TRAIN)/60);
   // Use estimated time if delayed
@@ -945,7 +945,7 @@ function renderEvening(data,boardPoint){
   document.getElementById('dashboard').innerHTML=html;
 
   // Start the live countdown tick
-  startCountdownTick(connections, boardPoint);
+  if(connections.length) startCountdownTick(connections, boardPoint);
 }
 
 // ── STATE ────────────────────────────────────────────────────
