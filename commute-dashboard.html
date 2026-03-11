@@ -523,17 +523,19 @@ function analyseConnections(trainDepsHAI, boardPoint){
   const rideMins=RIDE_TO_HAI[boardPoint]||8;
   const walkToStnMins=WALK_TO_STN[boardPoint]||5;
   const totalTravelSecs=(walkToStnMins+rideMins+WALK_AT_HAI)*60;
-  const buf=CONFIG.CONNECTION_BUFFER_MINS*60; // minimum buffer in secs
+  const buf=CONFIG.CONNECTION_BUFFER_MINS*60;
 
-  return (trainDepsHAI||[]).map(train=>{
-    // How many secs from NOW until this train leaves H&I
-    const trainSecsTil=train.secsUntil>0?train.secsUntil:secsUntil(train.time);
-    // Buffer = time until train - travel time to get there
-    const bufferSecs=trainSecsTil-totalTravelSecs;
-    const canMake=bufferSecs>=buf;
-    const tight=bufferSecs>=0&&bufferSecs<buf;
-    return{train,bufferSecs,canMake,tight,trainSecsTil};
-  });
+  return (trainDepsHAI||[])
+    .filter(train=>!train.cancelled)  // skip cancelled trains entirely
+    .map(train=>{
+      // Use estimated time if delayed, otherwise scheduled
+      const effectiveTime=train.delayed&&train.estimated?train.estimated:train.time;
+      const trainSecsTil=secsUntil(effectiveTime);
+      const bufferSecs=trainSecsTil-totalTravelSecs;
+      const canMake=bufferSecs>=buf;
+      const tight=bufferSecs>=0&&bufferSecs<buf;
+      return{train,bufferSecs,canMake,tight,trainSecsTil,effectiveTime,isDelayed:train.delayed};
+    });
 }
 
 // ── RECOMMENDATION LOGIC ─────────────────────────────────────
@@ -680,8 +682,10 @@ function renderCountdownBox(connections, boardPoint){
     const bufMin=Math.round(c.bufferSecs/60);
     const bufLabel=c.bufferSecs>=0?`${bufMin}m buffer`:`${Math.abs(bufMin)}m too late`;
     const v=c.canMake?(c.bufferSecs>5*60?'✓ Makeable':'⚠ Tight'):'✗ Missed';
+    const displayTime=c.effectiveTime||c.train.time;
+    const delayTag=c.isDelayed?` <span style="color:var(--amber);font-size:10px">delayed</span>`:'';
     return `<div class="train-row ${rowCls}">
-      <span class="train-time">${c.train.time}</span>
+      <span class="train-time">${displayTime}${delayTag}</span>
       <span class="train-buffer">${bufLabel} after ${WALK_TO_STN[boardPoint]||5}m walk + ${rideMins}m ride + ${buf}m platform change</span>
       <span class="train-verdict">${v}</span>
     </div>`;
@@ -694,7 +698,7 @@ function renderCountdownBox(connections, boardPoint){
         <div class="countdown-unit">to leave now</div>
       </div>
       <div class="countdown-text">
-        <div class="countdown-train">${targetConn.train.time} train from H&amp;I</div>
+        <div class="countdown-train">${targetConn.effectiveTime||targetConn.train.time} train from H&amp;I${targetConn.isDelayed?' <span style="font-size:11px;color:var(--amber);font-family:DM Mono,monospace">(delayed)</span>':''}</div>
         <div class="countdown-sub">Board at ${boardPoint==='wrr'?'Warren Street':'Oxford Circus'} · ${WALK_TO_STN[boardPoint]}m walk + ${rideMins}m ride + ${buf}m platform change</div>
         <div class="countdown-verdict" id="countdown-verdict">${verdict}</div>
       </div>
@@ -720,13 +724,16 @@ function startCountdownTick(connections, boardPoint){
     const buf=CONFIG.CONNECTION_BUFFER_MINS*60;
 
     // Recompute live buffer for each connection
-    const live=connections.map(c=>{
-      const trainSecsTil=secsUntil(c.train.time);
-      const walkToStnMins=WALK_TO_STN[boardPoint]||5;
-    const totalTravelSecs=(walkToStnMins+rideMins+CONFIG.CONNECTION_BUFFER_MINS)*60;
-      const bufferSecs=trainSecsTil-totalTravelSecs;
-      return{...c,bufferSecs,canMake:bufferSecs>=0,trainSecsTil};
-    });
+    const live=connections
+      .filter(c=>!c.train.cancelled)
+      .map(c=>{
+        const effectiveTime=c.train.delayed&&c.train.estimated?c.train.estimated:c.train.time;
+        const trainSecsTil=secsUntil(effectiveTime);
+        const walkToStnMins=WALK_TO_STN[boardPoint]||5;
+        const totalTravelSecs=(walkToStnMins+rideMins+CONFIG.CONNECTION_BUFFER_MINS)*60;
+        const bufferSecs=trainSecsTil-totalTravelSecs;
+        return{...c,bufferSecs,canMake:bufferSecs>=0,trainSecsTil,effectiveTime,isDelayed:c.train.delayed};
+      });
 
     const bestConn=live.find(c=>c.canMake);
     const target=bestConn||live[0];
