@@ -185,7 +185,7 @@ body.evening .football-alert.spurs{border-color:rgba(19,34,87,0.25);background:r
 <div class="header">
   <div class="header-left">
     <div class="eyebrow">Commute · London</div>
-    <h1 id="header-title">To <em>Oxford Circus</em></h1>
+    <h1 id="header-title">To <em>Work</em></h1>
   </div>
   <div class="header-right">
     <div class="clock-time" id="clock-time">--:--</div>
@@ -479,40 +479,65 @@ const MOCK={
 // ── DATA FETCHING ────────────────────────────────────────────
 async function fetchMorningData(){
   const tflReady=isLive(), darwinReady=isDarwinLive();
-  if(!tflReady&&!darwinReady) return MOCK.morning;
+  if(!tflReady&&!darwinReady) return{
+    piccadillyStatus:MOCK.morning.piccadillyStatus,
+    victoriaStatus:MOCK.morning.victoriaStatus,
+    trainStatus:MOCK.morning.trainStatus,
+    piccadillyDeps:null, trainDeps:null,
+    stationStatus:MOCK.morning.stationStatus
+  };
   try{
     const stationIds=[STOPS.boundsGreen,STOPS.highburyTube,STOPS.oxfordCircus];
     const[piccStatus,vicStatus,piccDeps,darwinDeps,darwinStatus,stnStatuses]=await Promise.all([
-      tflReady?fetchLineStatus('piccadilly'):Promise.resolve(MOCK.morning.piccadillyStatus),
-      tflReady?fetchLineStatus('victoria'):Promise.resolve(MOCK.morning.victoriaStatus),
-      tflReady?fetchArrivals(STOPS.boundsGreen,'piccadilly'):Promise.resolve(MOCK.morning.piccadillyDeps),
-      darwinReady?fetchDarwinDepartures(CONFIG.CRS_BOWES_PARK,8,'KGX','to'):Promise.resolve(null),
-      darwinReady?fetchDarwinServiceStatus(CONFIG.CRS_BOWES_PARK):Promise.resolve(MOCK.morning.trainStatus),
-      tflReady?fetchStationStatuses(stationIds):Promise.resolve(MOCK.morning.stationStatus),
+      tflReady?fetchLineStatus('piccadilly').catch(()=>MOCK.morning.piccadillyStatus):Promise.resolve(MOCK.morning.piccadillyStatus),
+      tflReady?fetchLineStatus('victoria').catch(()=>MOCK.morning.victoriaStatus):Promise.resolve(MOCK.morning.victoriaStatus),
+      tflReady?fetchArrivals(STOPS.boundsGreen,'piccadilly').catch(()=>null):Promise.resolve(null),
+      darwinReady?fetchDarwinDepartures(CONFIG.CRS_BOWES_PARK,8,'KGX','to').catch(()=>null):Promise.resolve(null),
+      darwinReady?fetchDarwinServiceStatus(CONFIG.CRS_BOWES_PARK).catch(()=>MOCK.morning.trainStatus):Promise.resolve(MOCK.morning.trainStatus),
+      tflReady?fetchStationStatuses(stationIds).catch(()=>MOCK.morning.stationStatus):Promise.resolve(MOCK.morning.stationStatus),
     ]);
-    return{piccadillyStatus:piccStatus,victoriaStatus:vicStatus,trainStatus:darwinStatus,
-      piccadillyDeps:piccDeps,trainDeps:darwinDeps||MOCK.morning.trainDeps,stationStatus:stnStatuses};
-  }catch(e){console.warn('Fetch error',e);return MOCK.morning;}
+    // Fall back per-field so a single API failure doesn't blank everything
+    return{
+      piccadillyStatus:piccStatus||MOCK.morning.piccadillyStatus,
+      victoriaStatus:vicStatus||MOCK.morning.victoriaStatus,
+      trainStatus:darwinStatus||MOCK.morning.trainStatus,
+      piccadillyDeps:piccDeps?.length?piccDeps:null,
+      trainDeps:darwinDeps?.length?darwinDeps:null,
+      stationStatus:stnStatuses||MOCK.morning.stationStatus
+    };
+  }catch(e){console.warn('Morning fetch error',e);return MOCK.morning;}
 }
 
 async function fetchEveningData(){
   const tflReady=isLive(), darwinReady=isDarwinLive();
-  if(!tflReady&&!darwinReady) return MOCK.evening;
+  if(!tflReady&&!darwinReady) return{
+    piccadillyStatus:MOCK.evening.piccadillyStatus,
+    victoriaStatus:MOCK.evening.victoriaStatus,
+    trainStatus:MOCK.evening.trainStatus,
+    victoriaDepsFP:null, victoriaWrr:null, trainDepsHAI:null,
+    stationStatus:MOCK.evening.stationStatus
+  };
   try{
     const stationIds=[STOPS.oxfordCircus,STOPS.warrenStreet,STOPS.highburyTube,STOPS.finsburyPark];
     const[piccStatus,vicStatus,vicDepsFP,vicDepsWrr,darwinDeps,darwinStatus,stnStatuses]=await Promise.all([
-      tflReady?fetchLineStatus('piccadilly'):Promise.resolve(MOCK.evening.piccadillyStatus),
-      tflReady?fetchLineStatus('victoria'):Promise.resolve(MOCK.evening.victoriaStatus),
-      tflReady?fetchArrivals(STOPS.finsburyPark,'victoria'):Promise.resolve(MOCK.evening.victoriaDepsFP),
-      tflReady?fetchArrivals(STOPS.warrenStreet,'victoria'):Promise.resolve(MOCK.evening.victoriaWrr),
-      darwinReady?fetchDarwinDepartures(CONFIG.CRS_HIGHBURY,8,CONFIG.CRS_BOWES_PARK,'to'):Promise.resolve(null),
-      darwinReady?fetchDarwinServiceStatus(CONFIG.CRS_HIGHBURY):Promise.resolve(MOCK.evening.trainStatus),
-      tflReady?fetchStationStatuses(stationIds):Promise.resolve(MOCK.evening.stationStatus),
+      tflReady?fetchLineStatus('piccadilly').catch(()=>MOCK.evening.piccadillyStatus):Promise.resolve(MOCK.evening.piccadillyStatus),
+      tflReady?fetchLineStatus('victoria').catch(()=>MOCK.evening.victoriaStatus):Promise.resolve(MOCK.evening.victoriaStatus),
+      tflReady?fetchArrivals(STOPS.finsburyPark,'victoria').catch(()=>null):Promise.resolve(null),
+      tflReady?fetchArrivals(STOPS.warrenStreet,'victoria').catch(()=>null):Promise.resolve(null),
+      darwinReady?fetchDarwinDepartures(CONFIG.CRS_HIGHBURY,8,CONFIG.CRS_BOWES_PARK,'to').catch(()=>null):Promise.resolve(null),
+      darwinReady?fetchDarwinServiceStatus(CONFIG.CRS_HIGHBURY).catch(()=>MOCK.evening.trainStatus):Promise.resolve(MOCK.evening.trainStatus),
+      tflReady?fetchStationStatuses(stationIds).catch(()=>MOCK.evening.stationStatus):Promise.resolve(MOCK.evening.stationStatus),
     ]);
-    return{piccadillyStatus:piccStatus,victoriaStatus:vicStatus,trainStatus:darwinStatus,
-      victoriaDepsFP:vicDepsFP,victoriaWrr:vicDepsWrr,
-      trainDepsHAI:darwinDeps||MOCK.evening.trainDepsHAI,stationStatus:stnStatuses};
-  }catch(e){console.warn('Fetch error',e);return MOCK.evening;}
+    return{
+      piccadillyStatus:piccStatus||MOCK.evening.piccadillyStatus,
+      victoriaStatus:vicStatus||MOCK.evening.victoriaStatus,
+      trainStatus:darwinStatus||MOCK.evening.trainStatus,
+      victoriaDepsFP:vicDepsFP?.length?vicDepsFP:null,
+      victoriaWrr:vicDepsWrr?.length?vicDepsWrr:null,
+      trainDepsHAI:darwinDeps?.length?darwinDeps:null,
+      stationStatus:stnStatuses||MOCK.evening.stationStatus
+    };
+  }catch(e){console.warn('Evening fetch error',e);return MOCK.evening;}
 }
 
 // ── CONNECTION LOGIC ─────────────────────────────────────────
@@ -617,7 +642,8 @@ function rLeg(color,lineName,from,fromId,to,toId,dur,stationStatus){
 }
 function rChange(txt){return `<div class="interchange-row">${txt}</div>`;}
 function rDeps(deps,label,targetTime){
-  if(!deps?.length) return `<div class="dep-label">${label}</div><div class="dep-chips"><span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">No data</span></div>`;
+  if(deps===null) return `<div class="dep-label">${label}</div><div class="dep-chips"><span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">⚠ Departure data unavailable</span></div>`;
+  if(!deps?.length) return `<div class="dep-label">${label}</div><div class="dep-chips"><span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">No departures found</span></div>`;
   return `<div class="dep-label">${label}</div><div class="dep-chips">`+
     deps.map((d,i)=>{
       const isNext=i===0;
@@ -769,38 +795,61 @@ function renderMorning(data){
   let html=rRec(rec)+`<div class="section-label">Your options</div>`;
 
   const tubeRec=rec.option==='tube';
-  html+=`<div class="option-card ${tubeRec?'recommended':''}">
-    ${tubeRec?'<div class="rec-badge">✓ Recommended</div>':''}
-    <div class="opt-title">Tube</div>
-    <div class="opt-subtitle">Bounds Green → Oxford Circus</div>`;
-  html+=rStatus([{label:'Piccadilly',ok:piccadillyStatus.ok,text:piccadillyStatus.text},{label:'Victoria',ok:victoriaStatus.ok,text:victoriaStatus.text}]);
-  if(!piccadillyStatus.ok&&piccadillyStatus.reason) html+=`<div class="disruption"><strong>⚠ Disruption</strong>${piccadillyStatus.reason}</div>`;
-  html+=`<div class="legs">
-    ${rLeg('#4a7fff','Piccadilly line','Bounds Green',STOPS.boundsGreen,'Highbury & Isl.',STOPS.highburyTube,'14 min',stationStatus)}
-    ${rChange('Change at Highbury & Islington')}
-    ${rLeg('#38c8f0','Victoria line','Highbury & Isl.',STOPS.highburyTube,'Oxford Circus',STOPS.oxfordCircus,'8 min',stationStatus)}
-  </div>`;
-  html+=rDeps(piccadillyDeps,'Next departures from Bounds Green');
-  html+=rStats(26,3,tubeScore);
-  html+=`</div>`;
-
   const trainRec=rec.option==='train';
+
+  // Check if the target train is cancelled
+  const targetTrain=trainDeps.find(d=>d.time===CONFIG.MORNING_TARGET_TRAIN);
+  const targetCancelled=targetTrain?.cancelled;
   const targetMins=Math.round(secsUntil(CONFIG.MORNING_TARGET_TRAIN)/60);
-  html+=`<div class="option-card ${trainRec?'recommended':''}">
-    ${trainRec?'<div class="rec-badge">✓ Recommended</div>':''}
-    <div class="opt-title">Train</div>
-    <div class="opt-subtitle">Bowes Park → Oxford Circus · Target: ${CONFIG.MORNING_TARGET_TRAIN}</div>`;
-  html+=rStatus([{label:'Great Northern',ok:trainStatus?.ok!==false,text:trainStatus?.text||'On time'},{label:'Victoria',ok:victoriaStatus.ok,text:victoriaStatus.text}]);
-  if(trainStatus&&!trainStatus.ok&&trainStatus.reason) html+=`<div class="disruption"><strong>⚠ Disruption</strong>${trainStatus.reason}</div>`;
-  if(targetMins>=0&&targetMins<=12) html+=`<div class="heads-up"><strong>⏱ Heads up</strong>Target ${CONFIG.MORNING_TARGET_TRAIN} train in ${targetMins} min — leave now!</div>`;
-  html+=`<div class="legs">
-    ${rLeg('#f5921e','Great Northern','Bowes Park',null,'Highbury & Isl.',STOPS.highburyTube,'18 min',stationStatus)}
-    ${rChange('Change at Highbury & Islington')}
-    ${rLeg('#38c8f0','Victoria line','Highbury & Isl.',STOPS.highburyTube,'Oxford Circus',STOPS.oxfordCircus,'8 min',stationStatus)}
-  </div>`;
-  html+=rDeps(trainDeps,'Next departures from Bowes Park',CONFIG.MORNING_TARGET_TRAIN);
-  html+=rStats(31,5,trainScore);
-  html+=`</div>`;
+  // Use estimated time if delayed
+  const targetEffective=targetTrain?.delayed&&targetTrain?.estimated?targetTrain.estimated:CONFIG.MORNING_TARGET_TRAIN;
+  const targetDelayed=targetTrain?.delayed;
+
+  function cardTube(){
+    let c=`<div class="option-card ${tubeRec?'recommended':''}">
+      ${tubeRec?'<div class="rec-badge">✓ Recommended</div>':''}
+      <div class="opt-title">Tube</div>
+      <div class="opt-subtitle">Bounds Green → Oxford Circus</div>`;
+    c+=rStatus([{label:'Piccadilly',ok:piccadillyStatus.ok,text:piccadillyStatus.text},{label:'Victoria',ok:victoriaStatus.ok,text:victoriaStatus.text}]);
+    if(!piccadillyStatus.ok&&piccadillyStatus.reason) c+=`<div class="disruption"><strong>⚠ Disruption</strong>${piccadillyStatus.reason}</div>`;
+    c+=`<div class="legs">
+      ${rLeg('#4a7fff','Piccadilly line','Bounds Green',STOPS.boundsGreen,'Highbury & Isl.',STOPS.highburyTube,'14 min',stationStatus)}
+      ${rChange('Change at Highbury & Islington')}
+      ${rLeg('#38c8f0','Victoria line','Highbury & Isl.',STOPS.highburyTube,'Oxford Circus',STOPS.oxfordCircus,'8 min',stationStatus)}
+    </div>`;
+    c+=rDeps(piccadillyDeps,'Next departures from Bounds Green');
+    c+=rStats(26,3,tubeScore);
+    c+=`</div>`;
+    return c;
+  }
+
+  function cardTrain(){
+    let c=`<div class="option-card ${trainRec?'recommended':''}">
+      ${trainRec?'<div class="rec-badge">✓ Recommended</div>':''}
+      <div class="opt-title">Train</div>
+      <div class="opt-subtitle">Bowes Park → Oxford Circus · Target: ${CONFIG.MORNING_TARGET_TRAIN}</div>`;
+    c+=rStatus([{label:'Great Northern',ok:trainStatus?.ok!==false,text:trainStatus?.text||'On time'},{label:'Victoria',ok:victoriaStatus.ok,text:victoriaStatus.text}]);
+    if(trainStatus&&!trainStatus.ok&&trainStatus.reason) c+=`<div class="disruption"><strong>⚠ Disruption</strong>${trainStatus.reason}</div>`;
+    if(targetCancelled){
+      c+=`<div class="conn-alert"><strong>⚠ ${CONFIG.MORNING_TARGET_TRAIN} train cancelled</strong>Your usual train is not running. Check next available departure below.</div>`;
+    } else if(targetDelayed&&targetMins>=0&&targetMins<=20){
+      c+=`<div class="heads-up"><strong>⏱ ${CONFIG.MORNING_TARGET_TRAIN} train delayed</strong>Now expected ${targetEffective} — ${Math.round(secsUntil(targetEffective)/60)} min away. Leave now.</div>`;
+    } else if(!targetCancelled&&targetMins>=0&&targetMins<=12){
+      c+=`<div class="heads-up"><strong>⏱ Heads up</strong>Target ${CONFIG.MORNING_TARGET_TRAIN} train in ${targetMins} min — leave now!</div>`;
+    }
+    c+=`<div class="legs">
+      ${rLeg('#f5921e','Great Northern','Bowes Park',null,'Highbury & Isl.',STOPS.highburyTube,'18 min',stationStatus)}
+      ${rChange('Change at Highbury & Islington')}
+      ${rLeg('#38c8f0','Victoria line','Highbury & Isl.',STOPS.highburyTube,'Oxford Circus',STOPS.oxfordCircus,'8 min',stationStatus)}
+    </div>`;
+    c+=rDeps(trainDeps,'Next departures from Bowes Park',CONFIG.MORNING_TARGET_TRAIN);
+    c+=rStats(31,5,trainScore);
+    c+=`</div>`;
+    return c;
+  }
+
+  // Render recommended option first
+  html+= tubeRec ? cardTube()+cardTrain() : cardTrain()+cardTube();
 
   document.getElementById('dashboard').innerHTML=html;
 }
@@ -918,7 +967,7 @@ function setDirection(dir){
   document.getElementById('theme-color-meta').content=dir==='evening'?'#f2ece0':'#0b0d14';
   document.getElementById('btn-morning').classList.toggle('active',dir==='morning');
   document.getElementById('btn-evening').classList.toggle('active',dir==='evening');
-  document.getElementById('header-title').innerHTML=dir==='morning'?'To <em>Oxford Circus</em>':'To <em>Home</em>';
+  document.getElementById('header-title').innerHTML=dir==='morning'?'To <em>Work</em>':'To <em>Home</em>';
   document.getElementById('demo-banner').style.display=isAnyLive()?'none':'flex';
   document.getElementById('board-toggle-wrap').style.display=dir==='evening'?'block':'none';
   loadAndRender();
