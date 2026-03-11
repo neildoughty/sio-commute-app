@@ -319,10 +319,11 @@ async function fetchStationStatuses(naptanIds){
 // ── NATIONAL RAIL — raildata.org.uk LDBWS ───────────────────
 const RAILDATA_BASE='https://api1.raildata.org.uk/1010-live-departure-board-dep1_2/LDBWS/api/20220120';
 
-async function fetchDarwinDepartures(crs,numRows=5){
+async function fetchDarwinDepartures(crs,numRows=5,filterCrs=null,filterType='to'){
   if(!isDarwinLive()) return null;
   try{
-    const url=`${RAILDATA_BASE}/GetDepBoardWithDetails/${crs}?numRows=${numRows}`;
+    let url=`${RAILDATA_BASE}/GetDepBoardWithDetails/${crs}?numRows=${numRows}`;
+    if(filterCrs) url+=`&filterCrs=${filterCrs}&filterType=${filterType}`;
     const r=await fetch(url,{headers:{'x-apikey':CONFIG.DARWIN_API_KEY}});
     if(!r.ok) throw new Error(`RailData HTTP ${r.status}`);
     const data=await r.json();
@@ -456,9 +457,10 @@ const MOCK={
     victoriaStatus:{ok:true,text:'Good service',reason:null},
     trainStatus:{ok:true,text:'On time',reason:null},
     piccadillyDeps:[mockDep(3),mockDep(8),mockDep(13),mockDep(18)],
-    trainDeps:['07:10','07:25','07:40','07:55','08:10'].map(t=>({
+    trainDeps:['07:10','07:25','07:40','07:55','08:10','08:25'].map(t=>({
       time:t,mins:minsLabel(Math.max(0,Math.round(secsUntil(t)/60))),
-      minsRaw:Math.round(secsUntil(t)/60),secsUntil:secsUntil(t),delayed:false
+      minsRaw:Math.round(secsUntil(t)/60),secsUntil:secsUntil(t),delayed:false,
+      destination:'London Kings Cross'
     })),
     stationStatus:MOCK_STN,
   },
@@ -484,7 +486,7 @@ async function fetchMorningData(){
       tflReady?fetchLineStatus('piccadilly'):Promise.resolve(MOCK.morning.piccadillyStatus),
       tflReady?fetchLineStatus('victoria'):Promise.resolve(MOCK.morning.victoriaStatus),
       tflReady?fetchArrivals(STOPS.boundsGreen,'piccadilly'):Promise.resolve(MOCK.morning.piccadillyDeps),
-      darwinReady?fetchDarwinDepartures(CONFIG.CRS_BOWES_PARK):Promise.resolve(null),
+      darwinReady?fetchDarwinDepartures(CONFIG.CRS_BOWES_PARK,8,'KGX','to'):Promise.resolve(null),
       darwinReady?fetchDarwinServiceStatus(CONFIG.CRS_BOWES_PARK):Promise.resolve(MOCK.morning.trainStatus),
       tflReady?fetchStationStatuses(stationIds):Promise.resolve(MOCK.morning.stationStatus),
     ]);
@@ -503,7 +505,7 @@ async function fetchEveningData(){
       tflReady?fetchLineStatus('victoria'):Promise.resolve(MOCK.evening.victoriaStatus),
       tflReady?fetchArrivals(STOPS.finsburyPark,'victoria'):Promise.resolve(MOCK.evening.victoriaDepsFP),
       tflReady?fetchArrivals(STOPS.warrenStreet,'victoria'):Promise.resolve(MOCK.evening.victoriaWrr),
-      darwinReady?fetchDarwinDepartures(CONFIG.CRS_HIGHBURY):Promise.resolve(null),
+      darwinReady?fetchDarwinDepartures(CONFIG.CRS_HIGHBURY,8,CONFIG.CRS_BOWES_PARK,'to'):Promise.resolve(null),
       darwinReady?fetchDarwinServiceStatus(CONFIG.CRS_HIGHBURY):Promise.resolve(MOCK.evening.trainStatus),
       tflReady?fetchStationStatuses(stationIds):Promise.resolve(MOCK.evening.stationStatus),
     ]);
