@@ -552,6 +552,7 @@ function eveningRec(data,boardPoint){
   const connections=analyseConnections(trainDepsHAI,boardPoint);
   const bestConn=connections.find(c=>c.canMake);
   const trainOk=trainStatus?.ok!==false;
+  const piccOk=piccadillyStatus.ok;
   const oxStatus=stationStatus?.[STOPS.oxfordCircus]||'unknown';
   const oxClosed=oxStatus==='closed';
   const oxBusy=oxStatus==='partClosed';
@@ -560,19 +561,35 @@ function eveningRec(data,boardPoint){
     headline:'Oxford Circus closed — board at Warren Street',
     reason:'Oxford Circus station is unavailable. Walk to Warren Street instead.'};
 
-  if(bestConn&&trainOk){
-    const bufMins=Math.round(bestConn.bufferSecs/60);
-    const prefix=oxBusy?'Oxford Circus is busy — consider Warren Street. Either way, c':'C';
-    return{option:'train',level:oxBusy?'warn':'good',
-      headline:'Catch the train from Highbury & Islington',
-      reason:`${prefix}atch the ${bestConn.train.time} train — ${bufMins} min to spare at H&I.`};
-  }
+  // Compare total door-to-door journey times:
+  // Tube via Finsbury Park is always ~22 min from boarding
+  // Train = wait for next makeable H&I departure + 18 min train ride
+  // If train total > tube total by more than 5 min, recommend tube
+  const TUBE_TOTAL=22;
+  const trainWaitMins=bestConn?Math.round(bestConn.trainSecsTil/60):999;
+  const trainTotal=trainWaitMins+18; // wait at H&I + train ride
+  const tubeIsFaster=trainTotal>(TUBE_TOTAL+5);
+
   if(!trainOk) return{option:'finsbury',level:'warn',
     headline:'Stay on the tube to Finsbury Park',
     reason:trainStatus?.reason||`Train disruption: ${trainStatus?.text}`};
-  return{option:'finsbury',level:'warn',
+
+  if(!bestConn) return{option:'finsbury',level:'warn',
     headline:'Stay on the tube to Finsbury Park',
-    reason:`No makeable train connection from H&I right now. Stay on tube to Finsbury Park.`};
+    reason:`No makeable train connection right now. Tube to Finsbury Park is your best option.`};
+
+  if(tubeIsFaster&&piccOk){
+    const diff=trainTotal-TUBE_TOTAL;
+    return{option:'finsbury',level:'warn',
+      headline:'Tube via Finsbury Park is faster right now',
+      reason:`Next train from H&I in ${trainWaitMins} min makes it ~${diff} min slower than staying on the tube. Jump off at Finsbury Park instead.`};
+  }
+
+  const bufMins=Math.round(bestConn.bufferSecs/60);
+  const prefix=oxBusy?'Oxford Circus is busy — consider Warren Street. Either way, c':'C';
+  return{option:'train',level:oxBusy?'warn':'good',
+    headline:'Catch the train from Highbury & Islington',
+    reason:`${prefix}atch the ${bestConn.train.time} train — ${bufMins} min to spare at H&I.`};
 }
 
 // ── RENDER HELPERS ───────────────────────────────────────────
