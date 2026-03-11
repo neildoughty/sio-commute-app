@@ -280,12 +280,13 @@ async function fetchLineStatus(lineId){
   return{ok:!bad,text:bad?bad.statusSeverityDescription:'Good service',reason:bad?.reason||null};
 }
 
-async function fetchArrivals(naptanId,lineId){
+async function fetchArrivals(naptanId,lineId,direction=null){
   const path=lineId?`/StopPoint/${naptanId}/Arrivals?lineIds=${lineId}`:`/StopPoint/${naptanId}/Arrivals`;
   const r=await fetch(tflUrl(path));
   const arr=await r.json();
   return arr
     .filter(a=>!lineId||a.lineId===lineId)
+    .filter(a=>!direction||a.direction===direction)
     .sort((a,b)=>a.timeToStation-b.timeToStation)
     .slice(0,5)
     .map(a=>{
@@ -491,8 +492,8 @@ async function fetchMorningData(){
     const[piccStatus,vicStatus,piccDeps,darwinDeps,darwinStatus,stnStatuses]=await Promise.all([
       tflReady?fetchLineStatus('piccadilly').catch(()=>MOCK.morning.piccadillyStatus):Promise.resolve(MOCK.morning.piccadillyStatus),
       tflReady?fetchLineStatus('victoria').catch(()=>MOCK.morning.victoriaStatus):Promise.resolve(MOCK.morning.victoriaStatus),
-      tflReady?fetchArrivals(STOPS.boundsGreen,'piccadilly').catch(()=>null):Promise.resolve(null),
-      darwinReady?fetchDarwinDepartures(CONFIG.CRS_BOWES_PARK,8,'KGX','to').catch(()=>null):Promise.resolve(null),
+      tflReady?fetchArrivals(STOPS.boundsGreen,'piccadilly','inbound').catch(()=>null):Promise.resolve(null),
+      darwinReady?fetchDarwinDepartures(CONFIG.CRS_BOWES_PARK,8,'MOG','to').catch(()=>null):Promise.resolve(null),
       darwinReady?fetchDarwinServiceStatus(CONFIG.CRS_BOWES_PARK).catch(()=>MOCK.morning.trainStatus):Promise.resolve(MOCK.morning.trainStatus),
       tflReady?fetchStationStatuses(stationIds).catch(()=>MOCK.morning.stationStatus):Promise.resolve(MOCK.morning.stationStatus),
     ]);
@@ -522,8 +523,8 @@ async function fetchEveningData(){
     const[piccStatus,vicStatus,vicDepsFP,vicDepsWrr,darwinDeps,darwinStatus,stnStatuses]=await Promise.all([
       tflReady?fetchLineStatus('piccadilly').catch(()=>MOCK.evening.piccadillyStatus):Promise.resolve(MOCK.evening.piccadillyStatus),
       tflReady?fetchLineStatus('victoria').catch(()=>MOCK.evening.victoriaStatus):Promise.resolve(MOCK.evening.victoriaStatus),
-      tflReady?fetchArrivals(STOPS.finsburyPark,'victoria').catch(()=>null):Promise.resolve(null),
-      tflReady?fetchArrivals(STOPS.warrenStreet,'victoria').catch(()=>null):Promise.resolve(null),
+      tflReady?fetchArrivals(STOPS.finsburyPark,'victoria','outbound').catch(()=>null):Promise.resolve(null),
+      tflReady?fetchArrivals(STOPS.warrenStreet,'victoria','outbound').catch(()=>null):Promise.resolve(null),
       darwinReady?fetchDarwinDepartures(CONFIG.CRS_HIGHBURY,8,CONFIG.CRS_BOWES_PARK,'to').catch(()=>null):Promise.resolve(null),
       darwinReady?fetchDarwinServiceStatus(CONFIG.CRS_HIGHBURY).catch(()=>MOCK.evening.trainStatus):Promise.resolve(MOCK.evening.trainStatus),
       tflReady?fetchStationStatuses(stationIds).catch(()=>MOCK.evening.stationStatus):Promise.resolve(MOCK.evening.stationStatus),
