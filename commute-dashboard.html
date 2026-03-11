@@ -805,46 +805,65 @@ function renderEvening(data,boardPoint){
 
   html+=`<div class="section-label" style="margin-top:20px;">Your options</div>`;
 
-  // ── TRAIN OPTION
+  // ── BUILD OPTION CARDS then order by score (recommended first) ──
   const trainRec=rec.option==='train'||rec.option==='warren';
-  html+=`<div class="option-card ${trainRec?'recommended':''}">
-    ${trainRec?'<div class="rec-badge">✓ Recommended</div>':''}
-    <div class="opt-title">Train from H&amp;I</div>
-    <div class="opt-subtitle">${boardPoint==='wrr'?'Warren Street':'Oxford Circus'} → Victoria → H&I → Bowes Park</div>`;
-  html+=rStatus([{label:'Victoria',ok:victoriaStatus.ok,text:victoriaStatus.text},{label:'Great Northern',ok:trainStatus?.ok!==false,text:trainStatus?.text||'On time'}]);
-  if(!makeable) html+=`<div class="conn-alert"><strong>⚠ No makeable connection</strong>No upcoming train from H&I allows enough time. Consider Finsbury Park option below.</div>`;
-  if(trainStatus&&!trainStatus.ok&&trainStatus.reason) html+=`<div class="disruption"><strong>⚠ Disruption</strong>${trainStatus.reason}</div>`;
-  if(oxBusy) html+=`<div class="heads-up"><strong>ℹ Oxford Circus busy</strong>Station is part-closed or crowded. You've selected Warren Street as your board point above.</div>`;
-  html+=`<div class="legs">
-    ${rLeg('#38c8f0','Victoria line',boardPoint==='wrr'?'Warren Street':'Oxford Circus',
-      boardPoint==='wrr'?STOPS.warrenStreet:STOPS.oxfordCircus,
-      'Highbury & Isl.',STOPS.highburyTube,`${rideMins} min`,stationStatus)}
-    ${rChange(`Change at Highbury & Islington (~${WALK_AT_HAI} min walk)`)}
-    ${rLeg('#f5921e','Great Northern','Highbury & Isl.',null,'Bowes Park',null,'18 min',stationStatus)}
-  </div>`;
-  html+=rDeps(trainDepsHAI,'Next trains from Highbury & Islington');
-  html+=rStats(30,4,trainScore);
-  html+=`</div>`;
-
-  // ── FINSBURY PARK OPTION
   const finRec=rec.option==='finsbury';
-  html+=`<div class="option-card ${finRec?'recommended':''}">
-    ${finRec?'<div class="rec-badge">✓ Recommended</div>':''}
-    <div class="opt-title">Tube via Finsbury Park</div>
-    <div class="opt-subtitle">${boardPoint==='wrr'?'Warren Street':'Oxford Circus'} → Victoria → Finsbury Park → Piccadilly → Bounds Green</div>`;
-  html+=rStatus([{label:'Victoria',ok:victoriaStatus.ok,text:victoriaStatus.text},{label:'Piccadilly',ok:piccadillyStatus.ok,text:piccadillyStatus.text}]);
-  if(!piccadillyStatus.ok&&piccadillyStatus.reason) html+=`<div class="disruption"><strong>⚠ Disruption</strong>${piccadillyStatus.reason}</div>`;
-  html+=`<div class="legs">
-    ${rLeg('#38c8f0','Victoria line',boardPoint==='wrr'?'Warren Street':'Oxford Circus',
-      boardPoint==='wrr'?STOPS.warrenStreet:STOPS.oxfordCircus,
-      'Finsbury Park',STOPS.finsburyPark,
-      boardPoint==='wrr'?'9 min':'12 min',stationStatus)}
-    ${rChange('Change at Finsbury Park')}
-    ${rLeg('#4a7fff','Piccadilly line','Finsbury Park',STOPS.finsburyPark,'Bounds Green',STOPS.boundsGreen,'6 min',stationStatus)}
-  </div>`;
-  html+=rDeps(boardDeps,`Next Victoria line trains from ${boardPoint==='wrr'?'Warren Street':'Oxford Circus'}`);
-  html+=rStats(22,3,finScore);
-  html+=`</div>`;
+
+  // Journey time bonus: tube via Finsbury Park is ~22 min vs ~30 min for train.
+  // But train is more comfortable and direct when makeable.
+  // Score already reflects disruption; add speed bonus to finsbury when train not makeable.
+  const trainScoreAdj = makeable ? trainScore : Math.min(trainScore, 35);
+  const finScoreAdj   = !makeable ? Math.min(finScore + 10, 88) : finScore;
+
+  function cardTrain(){
+    let c=`<div class="option-card ${trainRec?'recommended':''}">
+      ${trainRec?'<div class="rec-badge">✓ Recommended</div>':''}
+      <div class="opt-title">Train from H&amp;I</div>
+      <div class="opt-subtitle">${boardPoint==='wrr'?'Warren Street':'Oxford Circus'} → Victoria → H&I → Bowes Park</div>`;
+    c+=rStatus([{label:'Victoria',ok:victoriaStatus.ok,text:victoriaStatus.text},{label:'Great Northern',ok:trainStatus?.ok!==false,text:trainStatus?.text||'On time'}]);
+    if(!makeable) c+=`<div class="conn-alert"><strong>⚠ No makeable connection</strong>No upcoming train from H&I in time. The tube option below may be faster right now.</div>`;
+    if(trainStatus&&!trainStatus.ok&&trainStatus.reason) c+=`<div class="disruption"><strong>⚠ Disruption</strong>${trainStatus.reason}</div>`;
+    if(oxBusy) c+=`<div class="heads-up"><strong>ℹ Oxford Circus busy</strong>Station is part-closed or crowded. You've selected Warren Street as your board point above.</div>`;
+    c+=`<div class="legs">
+      ${rLeg('#38c8f0','Victoria line',boardPoint==='wrr'?'Warren Street':'Oxford Circus',
+        boardPoint==='wrr'?STOPS.warrenStreet:STOPS.oxfordCircus,
+        'Highbury & Isl.',STOPS.highburyTube,`${rideMins} min`,stationStatus)}
+      ${rChange(`Change at Highbury & Islington (~${WALK_AT_HAI} min platform change)`)}
+      ${rLeg('#f5921e','Great Northern','Highbury & Isl.',null,'Bowes Park',null,'18 min',stationStatus)}
+    </div>`;
+    c+=rDeps(trainDepsHAI,'Next trains from Highbury & Islington');
+    c+=rStats(30,4,trainScoreAdj);
+    c+=`</div>`;
+    return c;
+  }
+
+  function cardFinsbury(){
+    let c=`<div class="option-card ${finRec?'recommended':''}">
+      ${finRec?'<div class="rec-badge">✓ Recommended</div>':''}
+      <div class="opt-title">Tube via Finsbury Park</div>
+      <div class="opt-subtitle">${boardPoint==='wrr'?'Warren Street':'Oxford Circus'} → Victoria → Finsbury Park → Piccadilly → Bounds Green</div>`;
+    c+=rStatus([{label:'Victoria',ok:victoriaStatus.ok,text:victoriaStatus.text},{label:'Piccadilly',ok:piccadillyStatus.ok,text:piccadillyStatus.text}]);
+    if(!piccadillyStatus.ok&&piccadillyStatus.reason) c+=`<div class="disruption"><strong>⚠ Disruption</strong>${piccadillyStatus.reason}</div>`;
+    c+=`<div class="legs">
+      ${rLeg('#38c8f0','Victoria line',boardPoint==='wrr'?'Warren Street':'Oxford Circus',
+        boardPoint==='wrr'?STOPS.warrenStreet:STOPS.oxfordCircus,
+        'Finsbury Park',STOPS.finsburyPark,
+        boardPoint==='wrr'?'9 min':'12 min',stationStatus)}
+      ${rChange('Change at Finsbury Park')}
+      ${rLeg('#4a7fff','Piccadilly line','Finsbury Park',STOPS.finsburyPark,'Bounds Green',STOPS.boundsGreen,'6 min',stationStatus)}
+    </div>`;
+    c+=rDeps(boardDeps,`Next Victoria line trains from ${boardPoint==='wrr'?'Warren Street':'Oxford Circus'}`);
+    c+=rStats(22,3,finScoreAdj);
+    c+=`</div>`;
+    return c;
+  }
+
+  // Render recommended option first
+  if(finRec){
+    html+=cardFinsbury()+cardTrain();
+  } else {
+    html+=cardTrain()+cardFinsbury();
+  }
 
   document.getElementById('dashboard').innerHTML=html;
 
