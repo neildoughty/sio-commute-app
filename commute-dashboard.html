@@ -816,19 +816,8 @@ function renderEvening(data,boardPoint){
   getFixtures().then(renderFootballAlerts);
   let html=rRec(rec);
 
-  // ── LIVE CONNECTION COUNTDOWN
-  html+=`<div class="section-label">Connection to H&I train</div>`;
-  html+=renderCountdownBox(connections, boardPoint);
-
-  html+=`<div class="section-label" style="margin-top:20px;">Your options</div>`;
-
-  // ── BUILD OPTION CARDS then order by score (recommended first) ──
   const trainRec=rec.option==='train'||rec.option==='warren';
   const finRec=rec.option==='finsbury';
-
-  // Journey time bonus: tube via Finsbury Park is ~22 min vs ~30 min for train.
-  // But train is more comfortable and direct when makeable.
-  // Score already reflects disruption; add speed bonus to finsbury when train not makeable.
   const trainScoreAdj = makeable ? trainScore : Math.min(trainScore, 35);
   const finScoreAdj   = !makeable ? Math.min(finScore + 10, 88) : finScore;
 
@@ -854,6 +843,15 @@ function renderEvening(data,boardPoint){
     return c;
   }
 
+  function cardTrainWithCountdown(){
+    // countdown panel + train card together so they move as one block
+    let c=`<div class="section-label">Connection to H&I train</div>`;
+    c+=renderCountdownBox(connections, boardPoint);
+    c+=`<div class="section-label" style="margin-top:20px;">Your options</div>`;
+    c+=cardTrain();
+    return c;
+  }
+
   function cardFinsbury(){
     let c=`<div class="option-card ${finRec?'recommended':''}">
       ${finRec?'<div class="rec-badge">✓ Recommended</div>':''}
@@ -875,11 +873,17 @@ function renderEvening(data,boardPoint){
     return c;
   }
 
-  // Render recommended option first
+  // Render recommended option first — countdown travels with the train card
   if(finRec){
-    html+=cardFinsbury()+cardTrain();
+    html+=`<div class="section-label">Your options</div>`;
+    html+=cardFinsbury();
+    // Train card below, with its countdown tucked inside
+    html+=`<div class="section-label" style="margin-top:20px;">Alternative: train via H&I</div>`;
+    html+=renderCountdownBox(connections, boardPoint);
+    html+=cardTrain();
   } else {
-    html+=cardTrain()+cardFinsbury();
+    html+=cardTrainWithCountdown();
+    html+=cardFinsbury();
   }
 
   document.getElementById('dashboard').innerHTML=html;
