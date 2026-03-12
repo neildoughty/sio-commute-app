@@ -301,13 +301,18 @@ async function fetchLineStatus(lineId){
   return{ok:!bad,text:bad?bad.statusSeverityDescription:'Good service',reason:bad?.reason||null};
 }
 
-async function fetchArrivals(naptanId,lineId,direction=null){
+async function fetchArrivals(naptanId,lineId,excludeTowards=null){
   const path=lineId?`/StopPoint/${naptanId}/Arrivals?lineIds=${lineId}`:`/StopPoint/${naptanId}/Arrivals`;
   const r=await fetch(tflUrl(path));
   const arr=await r.json();
   return arr
     .filter(a=>!lineId||a.lineId===lineId)
-    .filter(a=>!direction||a.direction===direction)
+    .filter(a=>{
+      if(!excludeTowards) return true;
+      // excludeTowards is an array of strings — filter OUT arrivals whose destination matches any
+      const dest=(a.towards||a.destinationName||'').toLowerCase();
+      return !excludeTowards.some(ex=>dest.includes(ex.toLowerCase()));
+    })
     .sort((a,b)=>a.timeToStation-b.timeToStation)
     .slice(0,5)
     .map(a=>{
@@ -456,15 +461,20 @@ async function fetchCrowding(naptanId){
   try{
     const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
     const day = days[new Date().getDay()];
-    const r = await fetch(tflUrl(`/StopPoint/${naptanId}/Crowding/${day}`));
+    // Correct TfL crowding endpoint
+    const r = await fetch(tflUrl(`/crowding/${naptanId}/${day}`));
     if(!r.ok) return null;
     const d = await r.json();
-    // d is array of {timeBand, percentageOfBaseline} objects
+    // Response shape: { percentageBaselines: [{timeBand, percentageOfBaseline}] }
+    const baselines = d.percentageBaselines || d;
     const hour = new Date().getHours();
-    // timeBand format is "HH:00" — find the matching hour
-    const band = d.find(b => parseInt(b.timeBand) === hour) || d[0];
+    // timeBand is "0600","0700" etc — match current hour
+    const padHour = String(hour).padStart(2,'0') + '00';
+    const band = baselines.find(b => b.timeBand === padHour)
+               || baselines.find(b => parseInt(b.timeBand) === hour * 100)
+               || baselines[0];
     const pct = band ? Math.round(band.percentageOfBaseline) : null;
-    const result = { pct, raw: d };
+    const result = { pct, raw: baselines };
     cachedCrowding[naptanId] = result;
     return result;
   }catch(e){ console.warn('Crowding fetch failed:', e); return null; }
@@ -626,7 +636,7 @@ async function fetchMorningData(){
     const[piccStatus,vicStatus,piccDeps,darwinDeps,darwinStatus,stnStatuses]=await Promise.all([
       tflReady?fetchLineStatus('piccadilly').catch(()=>MOCK.morning.piccadillyStatus):Promise.resolve(MOCK.morning.piccadillyStatus),
       tflReady?fetchLineStatus('victoria').catch(()=>MOCK.morning.victoriaStatus):Promise.resolve(MOCK.morning.victoriaStatus),
-      tflReady?fetchArrivals(STOPS.boundsGreen,'piccadilly','inbound').catch(()=>null):Promise.resolve(null),
+      tflReady?fetchArrivals(STOPS.boundsGreen,'piccadilly',['Cockfosters','Oakwood']).catch(()=>null):Promise.resolve(null),
       darwinReady?fetchDarwinDepartures(CONFIG.CRS_BOWES_PARK,8,'MOG','to').catch(()=>null):Promise.resolve(null),
       darwinReady?fetchDarwinServiceStatus(CONFIG.CRS_BOWES_PARK).catch(()=>MOCK.morning.trainStatus):Promise.resolve(MOCK.morning.trainStatus),
       tflReady?fetchStationStatuses(stationIds).catch(()=>MOCK.morning.stationStatus):Promise.resolve(MOCK.morning.stationStatus),
@@ -657,8 +667,8 @@ async function fetchEveningData(){
     const[piccStatus,vicStatus,vicDepsFP,vicDepsWrr,darwinDeps,darwinStatus,stnStatuses]=await Promise.all([
       tflReady?fetchLineStatus('piccadilly').catch(()=>MOCK.evening.piccadillyStatus):Promise.resolve(MOCK.evening.piccadillyStatus),
       tflReady?fetchLineStatus('victoria').catch(()=>MOCK.evening.victoriaStatus):Promise.resolve(MOCK.evening.victoriaStatus),
-      tflReady?fetchArrivals(STOPS.finsburyPark,'victoria','outbound').catch(()=>null):Promise.resolve(null),
-      tflReady?fetchArrivals(STOPS.warrenStreet,'victoria','outbound').catch(()=>null):Promise.resolve(null),
+      tflReady?fetchArrivals(STOPS.finsburyPark,'victoria',['Brixton','Stockwell','Vauxhall']).catch(()=>null):Promise.resolve(null),
+      tflReady?fetchArrivals(STOPS.warrenStreet,'victoria',['Brixton','Stockwell','Vauxhall']).catch(()=>null):Promise.resolve(null),
       darwinReady?fetchDarwinDepartures(CONFIG.CRS_HIGHBURY,8,CONFIG.CRS_BOWES_PARK,'to').catch(()=>null):Promise.resolve(null),
       darwinReady?fetchDarwinServiceStatus(CONFIG.CRS_HIGHBURY).catch(()=>MOCK.evening.trainStatus):Promise.resolve(MOCK.evening.trainStatus),
       tflReady?fetchStationStatuses(stationIds).catch(()=>MOCK.evening.stationStatus):Promise.resolve(MOCK.evening.stationStatus),
