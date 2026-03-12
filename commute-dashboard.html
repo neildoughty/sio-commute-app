@@ -45,6 +45,24 @@ h1 em{font-style:normal;color:var(--accent);}
 
 .demo-banner{background:transparent;border:1px dashed var(--border);border-radius:10px;padding:10px 14px;margin-bottom:20px;font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);line-height:1.6;display:flex;align-items:center;gap:8px;}
 .demo-banner span{color:var(--accent);}
+/* WEATHER STRIP */
+.weather-strip{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:11px;background:var(--surface);border:1px solid var(--border);margin-bottom:16px;font-family:'DM Mono',monospace;}
+.weather-icon{font-size:22px;flex-shrink:0;line-height:1;}
+.weather-body{flex:1;}
+.weather-main{font-size:13px;font-weight:500;color:var(--head);}
+.weather-sub{font-size:11px;color:var(--muted);margin-top:1px;}
+.weather-temp{font-size:20px;font-weight:500;color:var(--head);font-family:'DM Mono',monospace;flex-shrink:0;}
+
+/* CROWDING BADGE on option cards */
+.crowding-bar{display:flex;align-items:center;gap:8px;font-family:'DM Mono',monospace;font-size:11px;margin-bottom:12px;}
+.crowding-label{color:var(--muted);}
+.crowding-pips{display:flex;gap:3px;}
+.crowding-pip{width:18px;height:6px;border-radius:3px;background:var(--border);}
+.crowding-pip.filled-low{background:var(--green);}
+.crowding-pip.filled-mid{background:var(--amber);}
+.crowding-pip.filled-high{background:var(--red);}
+.crowding-val{color:var(--muted);}
+
 /* FOOTBALL ALERT */
 .football-alert{display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 16px;margin-bottom:18px;animation:fadeUp 0.3s ease both;}
 .football-alert .fa-badge{font-size:22px;flex-shrink:0;line-height:1;}
@@ -194,13 +212,16 @@ body.evening .football-alert.spurs{border-color:rgba(19,34,87,0.25);background:r
 </div>
 
 <div class="direction-toggle">
-  <button class="toggle-btn active" id="btn-morning" onclick="setDirection('morning')">↗ To Oxford Circus</button>
+  <button class="toggle-btn active" id="btn-morning" onclick="setDirection('morning')">↗ To the BBC</button>
   <button class="toggle-btn" id="btn-evening" onclick="setDirection('evening')">↙ To Home</button>
 </div>
 
 <div class="demo-banner" id="demo-banner">
   <span>Demo mode</span> — add API keys to config.js for live data
 </div>
+
+<!-- Weather strip -->
+<div id="weather-strip-wrap"></div>
 
 <!-- Football alert — injected if there is a home game today -->
 <div id="football-alert-wrap"></div>
@@ -352,6 +373,119 @@ async function fetchDarwinServiceStatus(crs){
   if(cancelled.length>0) return{ok:false,text:'Cancellations',reason:cancelled[0].cancelReason||'Some services cancelled.'};
   if(delayed.length>=2) return{ok:false,text:'Delays',reason:`${delayed.length} of the next departures are showing delays.`};
   return{ok:true,text:'On time',reason:null};
+}
+
+
+// ── WEATHER (Open-Meteo, no key needed) ──────────────────────
+// Morning: Bounds Green coords  Evening: Oxford Circus / Warren Street coords
+const WEATHER_LOCATIONS = {
+  morning: { lat: 51.5978, lon: -0.1255, label: 'Bounds Green' },
+  evening_oxc: { lat: 51.5152, lon: -0.1414, label: 'Oxford Circus' },
+  evening_wrr: { lat: 51.5236, lon: -0.1388, label: 'Warren Street' },
+};
+
+const WMO_ICONS = {
+  0:'☀️',1:'🌤️',2:'⛅',3:'☁️',
+  45:'🌫️',48:'🌫️',
+  51:'🌦️',53:'🌦️',55:'🌧️',
+  61:'🌧️',63:'🌧️',65:'🌧️',
+  71:'🌨️',73:'🌨️',75:'🌨️',
+  77:'🌨️',
+  80:'🌦️',81:'🌧️',82:'⛈️',
+  95:'⛈️',96:'⛈️',99:'⛈️',
+};
+const WMO_DESC = {
+  0:'Clear',1:'Mainly clear',2:'Partly cloudy',3:'Overcast',
+  45:'Foggy',48:'Icy fog',
+  51:'Light drizzle',53:'Drizzle',55:'Heavy drizzle',
+  61:'Light rain',63:'Rain',65:'Heavy rain',
+  71:'Light snow',73:'Snow',75:'Heavy snow',77:'Snow grains',
+  80:'Light showers',81:'Showers',82:'Heavy showers',
+  95:'Thunderstorm',96:'Thunderstorm',99:'Thunderstorm',
+};
+
+let cachedWeather = {};
+
+async function fetchWeather(locKey){
+  if(cachedWeather[locKey]) return cachedWeather[locKey];
+  const loc = WEATHER_LOCATIONS[locKey];
+  if(!loc) return null;
+  try{
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${loc.lat}&longitude=${loc.lon}&current=temperature_2m,weathercode,windspeed_10m,precipitation&wind_speed_unit=mph&temperature_unit=celsius&timezone=Europe%2FLondon`;
+    const r = await fetch(url);
+    const d = await r.json();
+    const c = d.current;
+    const code = c.weathercode;
+    const result = {
+      temp: Math.round(c.temperature_2m),
+      icon: WMO_ICONS[code] || '🌡️',
+      desc: WMO_DESC[code] || 'Unknown',
+      wind: Math.round(c.windspeed_10m),
+      rain: c.precipitation > 0,
+      label: loc.label,
+    };
+    cachedWeather[locKey] = result;
+    return result;
+  }catch(e){ console.warn('Weather fetch failed:', e); return null; }
+}
+
+function renderWeatherStrip(w){
+  const wrap = document.getElementById('weather-strip-wrap');
+  if(!wrap) return;
+  if(!w){ wrap.innerHTML=''; return; }
+  const umbrellaNote = w.rain ? ' · <span style="color:var(--amber)">☂ Take an umbrella</span>' : '';
+  const windNote = w.wind > 20 ? ` · ${w.wind} mph wind` : '';
+  wrap.innerHTML = `<div class="weather-strip">
+    <div class="weather-icon">${w.icon}</div>
+    <div class="weather-body">
+      <div class="weather-main">${w.desc}${umbrellaNote}</div>
+      <div class="weather-sub">At ${w.label}${windNote}</div>
+    </div>
+    <div class="weather-temp">${w.temp}°</div>
+  </div>`;
+}
+
+// ── TFL CROWDING ──────────────────────────────────────────────
+// TfL crowding endpoint: /StopPoint/{naptanId}/Crowding/{Naptan}
+// Returns hourly crowding index 0-1 for each day
+let cachedCrowding = {};
+
+async function fetchCrowding(naptanId){
+  if(!isLive()) return null;
+  if(cachedCrowding[naptanId]) return cachedCrowding[naptanId];
+  try{
+    const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    const day = days[new Date().getDay()];
+    const r = await fetch(tflUrl(`/StopPoint/${naptanId}/Crowding/${day}`));
+    if(!r.ok) return null;
+    const d = await r.json();
+    // d is array of {timeBand, percentageOfBaseline} objects
+    const hour = new Date().getHours();
+    // timeBand format is "HH:00" — find the matching hour
+    const band = d.find(b => parseInt(b.timeBand) === hour) || d[0];
+    const pct = band ? Math.round(band.percentageOfBaseline) : null;
+    const result = { pct, raw: d };
+    cachedCrowding[naptanId] = result;
+    return result;
+  }catch(e){ console.warn('Crowding fetch failed:', e); return null; }
+}
+
+function crowdingHtml(crowding, label){
+  if(!crowding || crowding.pct === null) return '';
+  const pct = crowding.pct;
+  // pct is % of baseline — >100 means busier than average
+  // Normalise to 5 pips: <60=1, 60-80=2, 80-100=3, 100-120=4, >120=5
+  const pips = pct < 60 ? 1 : pct < 80 ? 2 : pct < 100 ? 3 : pct < 120 ? 4 : 5;
+  const level = pips <= 2 ? 'low' : pips <= 3 ? 'mid' : 'high';
+  const desc = pips <= 2 ? 'Quiet' : pips <= 3 ? 'Moderate' : pips <= 4 ? 'Busy' : 'Very busy';
+  const pipHtml = Array.from({length:5},(_,i) =>
+    `<div class="crowding-pip${i<pips?' filled-'+level:''}"></div>`
+  ).join('');
+  return `<div class="crowding-bar">
+    <span class="crowding-label">${label} now:</span>
+    <div class="crowding-pips">${pipHtml}</div>
+    <span class="crowding-val">${desc}</span>
+  </div>`;
 }
 
 // ── STOP IDs ─────────────────────────────────────────────────
@@ -853,6 +987,9 @@ function renderMorning(data){
   html+= tubeRec ? cardTube()+cardTrain() : cardTrain()+cardTube();
 
   document.getElementById('dashboard').innerHTML=html;
+
+  // Fetch and inject weather asynchronously so it doesn't block the render
+  fetchWeather('morning').then(renderWeatherStrip);
 }
 
 // ── EVENING RENDER ───────────────────────────────────────────
@@ -947,6 +1084,66 @@ function renderEvening(data,boardPoint){
 
   // Start the live countdown tick
   if(connections.length) startCountdownTick(connections, boardPoint);
+
+  // Weather at the board point
+  const weatherLoc = boardPoint==='wrr' ? 'evening_wrr' : 'evening_oxc';
+  fetchWeather(weatherLoc).then(renderWeatherStrip);
+
+  // Crowding: fetch for Oxford Circus and Warren Street, inject into cards
+  const crowdingIds = {
+    oxc: STOPS.oxfordCircus,   // 940GZZLUOXC
+    wrr: STOPS.warrenStreet,   // 940GZZLUWRR
+    hai: STOPS.highburyTube,   // 940GZZLUHAI
+  };
+  Promise.all([
+    fetchCrowding(crowdingIds.oxc),
+    fetchCrowding(crowdingIds.wrr),
+    fetchCrowding(crowdingIds.hai),
+  ]).then(([oxcCrowd, wrrCrowd, haiCrowd])=>{
+    // Inject crowding bars before the first dep-label in each card
+    const dash = document.getElementById('dashboard');
+    if(!dash) return;
+    // Re-render evening with crowding data baked in — simpler than DOM surgery
+    renderEveningWithCrowding(data, boardPoint, {oxc:oxcCrowd, wrr:wrrCrowd, hai:haiCrowd});
+  });
+}
+
+function renderEveningWithCrowding(data, boardPoint, crowding){
+  // Find all option-card elements and inject crowding bar after opt-subtitle
+  const dash = document.getElementById('dashboard');
+  if(!dash) return;
+
+  // Oxford Circus / Warren Street crowding — relevant board point
+  const boardCrowd = boardPoint==='wrr' ? crowding.wrr : crowding.oxc;
+  const boardLabel = boardPoint==='wrr' ? 'Warren Street' : 'Oxford Circus';
+  const haiCrowd   = crowding.hai;
+
+  // Insert crowding into train card (first card with "Train from H&I" title)
+  const cards = dash.querySelectorAll('.option-card');
+  cards.forEach(card=>{
+    const title = card.querySelector('.opt-title')?.textContent||'';
+    const subtitle = card.querySelector('.opt-subtitle');
+    if(!subtitle) return;
+
+    if(title.includes('Train')){
+      // Show board point crowding + H&I crowding
+      const boardBar = crowdingHtml(boardCrowd, boardLabel);
+      const haiBar   = crowdingHtml(haiCrowd, 'Highbury & Isl.');
+      if(boardBar||haiBar){
+        const div = document.createElement('div');
+        div.innerHTML = (boardBar||'') + (haiBar||'');
+        subtitle.insertAdjacentElement('afterend', div);
+      }
+    } else if(title.includes('Tube')){
+      // Show board point crowding
+      const boardBar = crowdingHtml(boardCrowd, boardLabel);
+      if(boardBar){
+        const div = document.createElement('div');
+        div.innerHTML = boardBar;
+        subtitle.insertAdjacentElement('afterend', div);
+      }
+    }
+  });
 }
 
 // ── STATE ────────────────────────────────────────────────────
@@ -962,6 +1159,11 @@ function setBoardPoint(bp){
 }
 
 function setDirection(dir){
+  // Clear weather strip immediately so stale data doesn't show briefly
+  const ws = document.getElementById('weather-strip-wrap');
+  if(ws) ws.innerHTML='';
+  // Reset weather cache so it re-fetches for the new direction's location
+  cachedWeather = {};
   direction=dir;
   document.body.classList.toggle('evening',dir==='evening');
   document.documentElement.classList.toggle('evening-mode',dir==='evening');
