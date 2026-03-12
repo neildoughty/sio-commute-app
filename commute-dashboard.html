@@ -301,28 +301,18 @@ async function fetchLineStatus(lineId){
   return{ok:!bad,text:bad?bad.statusSeverityDescription:'Good service',reason:bad?.reason||null};
 }
 
-async function fetchArrivals(naptanId,lineId,excludeTowards=null){
+async function fetchArrivals(naptanId,lineId,includeTowards=null){
   const path=lineId?`/StopPoint/${naptanId}/Arrivals?lineIds=${lineId}`:`/StopPoint/${naptanId}/Arrivals`;
   const r=await fetch(tflUrl(path));
   const arr=await r.json();
-  // DEBUG — remove after diagnosing
-  console.log(`[TfL arrivals] ${naptanId} raw count:`, arr.length);
-  if(arr[0]) console.log(`[TfL arrivals] sample fields:`, {
-    lineId:arr[0].lineId, direction:arr[0].direction,
-    towards:arr[0].towards, destinationName:arr[0].destinationName,
-    platformName:arr[0].platformName
-  });
-  const filtered = arr
+  return arr
     .filter(a=>!lineId||a.lineId===lineId)
     .filter(a=>{
-      if(!excludeTowards) return true;
+      if(!includeTowards) return true;
+      // includeTowards: only keep arrivals whose destination matches one of these strings
       const dest=(a.towards||a.destinationName||'').toLowerCase();
-      const kept = !excludeTowards.some(ex=>dest.includes(ex.toLowerCase()));
-      if(!kept) console.log(`[TfL arrivals] filtered out: towards="${a.towards}" dest="${a.destinationName}"`);
-      return kept;
-    });
-  console.log(`[TfL arrivals] after filter:`, filtered.length);
-  return filtered
+      return includeTowards.some(inc=>dest.includes(inc.toLowerCase()));
+    })
     .sort((a,b)=>a.timeToStation-b.timeToStation)
     .slice(0,5)
     .map(a=>{
@@ -469,26 +459,24 @@ async function fetchCrowding(naptanId){
   if(!isLive()) return null;
   if(cachedCrowding[naptanId]) return cachedCrowding[naptanId];
   try{
-    const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-    const day = days[new Date().getDay()];
-    // Correct TfL crowding endpoint
-    const r = await fetch(tflUrl(`/crowding/${naptanId}/${day}`));
-    console.log(`[TfL crowding] ${naptanId} status:`, r.status);
+    // Correct endpoint: /Crowding/{naptanId} — returns full week profile
+    const r = await fetch(tflUrl(`/Crowding/${naptanId}`));
     if(!r.ok) return null;
     const d = await r.json();
-    console.log(`[TfL crowding] response keys:`, Object.keys(d));
-    console.log(`[TfL crowding] sample:`, JSON.stringify(d).slice(0,300));
-    // Response shape: { percentageBaselines: [{timeBand, percentageOfBaseline}] }
-    const baselines = d.percentageBaselines || d;
+    // Response: { daysOfWeek: [{ dayOfWeek, timeBands: [{timeBand, percentageOfBaseLine}] }] }
+    const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    const today = days[new Date().getDay()];
+    const dayData = (d.daysOfWeek||[]).find(x=>x.dayOfWeek===today) || (d.daysOfWeek||[])[0];
+    if(!dayData) return null;
     const hour = new Date().getHours();
-    // timeBand is "0600","0700" etc — match current hour
+    // timeBand format: "0600", "0700" etc
     const padHour = String(hour).padStart(2,'0') + '00';
-    console.log(`[TfL crowding] looking for timeBand:`, padHour, 'in', baselines.slice(0,3).map(b=>b.timeBand));
-    const band = baselines.find(b => b.timeBand === padHour)
-               || baselines.find(b => parseInt(b.timeBand) === hour * 100)
-               || baselines[0];
-    const pct = band ? Math.round(band.percentageOfBaseline) : null;
-    const result = { pct, raw: baselines };
+    const band = (dayData.timeBands||[]).find(b=>b.timeBand===padHour)
+               || (dayData.timeBands||[])[0];
+    // percentageOfBaseLine is a fraction (0-1), multiply by 100
+    const raw = band?.percentageOfBaseLine ?? null;
+    const pct = raw !== null ? Math.round(raw > 1 ? raw : raw * 100) : null;
+    const result = { pct };
     cachedCrowding[naptanId] = result;
     return result;
   }catch(e){ console.warn('Crowding fetch failed:', e); return null; }
@@ -650,7 +638,7 @@ async function fetchMorningData(){
     const[piccStatus,vicStatus,piccDeps,darwinDeps,darwinStatus,stnStatuses]=await Promise.all([
       tflReady?fetchLineStatus('piccadilly').catch(()=>MOCK.morning.piccadillyStatus):Promise.resolve(MOCK.morning.piccadillyStatus),
       tflReady?fetchLineStatus('victoria').catch(()=>MOCK.morning.victoriaStatus):Promise.resolve(MOCK.morning.victoriaStatus),
-      tflReady?fetchArrivals(STOPS.boundsGreen,'piccadilly',['Cockfosters','Oakwood']).catch(()=>null):Promise.resolve(null),
+      tflReady?fetchArrivals(STOPS.boundsGreen,'piccadilly',['Heathrow','Uxbridge','Acton Town','Hammersmith','Kings Cross','Rayners Lane']).catch(()=>null):Promise.resolve(null),
       darwinReady?fetchDarwinDepartures(CONFIG.CRS_BOWES_PARK,8,'MOG','to').catch(()=>null):Promise.resolve(null),
       darwinReady?fetchDarwinServiceStatus(CONFIG.CRS_BOWES_PARK).catch(()=>MOCK.morning.trainStatus):Promise.resolve(MOCK.morning.trainStatus),
       tflReady?fetchStationStatuses(stationIds).catch(()=>MOCK.morning.stationStatus):Promise.resolve(MOCK.morning.stationStatus),
@@ -681,8 +669,8 @@ async function fetchEveningData(){
     const[piccStatus,vicStatus,vicDepsFP,vicDepsWrr,darwinDeps,darwinStatus,stnStatuses]=await Promise.all([
       tflReady?fetchLineStatus('piccadilly').catch(()=>MOCK.evening.piccadillyStatus):Promise.resolve(MOCK.evening.piccadillyStatus),
       tflReady?fetchLineStatus('victoria').catch(()=>MOCK.evening.victoriaStatus):Promise.resolve(MOCK.evening.victoriaStatus),
-      tflReady?fetchArrivals(STOPS.finsburyPark,'victoria',['Brixton','Stockwell','Vauxhall']).catch(()=>null):Promise.resolve(null),
-      tflReady?fetchArrivals(STOPS.warrenStreet,'victoria',['Brixton','Stockwell','Vauxhall']).catch(()=>null):Promise.resolve(null),
+      tflReady?fetchArrivals(STOPS.finsburyPark,'victoria',['Walthamstow','Seven Sisters','Blackhorse']).catch(()=>null):Promise.resolve(null),
+      tflReady?fetchArrivals(STOPS.warrenStreet,'victoria',['Walthamstow','Seven Sisters','Blackhorse']).catch(()=>null):Promise.resolve(null),
       darwinReady?fetchDarwinDepartures(CONFIG.CRS_HIGHBURY,8,CONFIG.CRS_BOWES_PARK,'to').catch(()=>null):Promise.resolve(null),
       darwinReady?fetchDarwinServiceStatus(CONFIG.CRS_HIGHBURY).catch(()=>MOCK.evening.trainStatus):Promise.resolve(MOCK.evening.trainStatus),
       tflReady?fetchStationStatuses(stationIds).catch(()=>MOCK.evening.stationStatus):Promise.resolve(MOCK.evening.stationStatus),
@@ -1113,60 +1101,32 @@ function renderEvening(data,boardPoint){
   const weatherLoc = boardPoint==='wrr' ? 'evening_wrr' : 'evening_oxc';
   fetchWeather(weatherLoc).then(renderWeatherStrip);
 
-  // Crowding: fetch for Oxford Circus and Warren Street, inject into cards
-  const crowdingIds = {
-    oxc: STOPS.oxfordCircus,   // 940GZZLUOXC
-    wrr: STOPS.warrenStreet,   // 940GZZLUWRR
-    hai: STOPS.highburyTube,   // 940GZZLUHAI
-  };
+  // Crowding: fetch after render so it doesn't block the panel
   Promise.all([
-    fetchCrowding(crowdingIds.oxc),
-    fetchCrowding(crowdingIds.wrr),
-    fetchCrowding(crowdingIds.hai),
+    fetchCrowding(STOPS.oxfordCircus),
+    fetchCrowding(STOPS.warrenStreet),
+    fetchCrowding(STOPS.highburyTube),
   ]).then(([oxcCrowd, wrrCrowd, haiCrowd])=>{
-    // Inject crowding bars before the first dep-label in each card
+    const boardCrowd = boardPoint==='wrr' ? wrrCrowd : oxcCrowd;
+    const boardLabel = boardPoint==='wrr' ? 'Warren Street' : 'Oxford Circus';
     const dash = document.getElementById('dashboard');
     if(!dash) return;
-    // Re-render evening with crowding data baked in — simpler than DOM surgery
-    renderEveningWithCrowding(data, boardPoint, {oxc:oxcCrowd, wrr:wrrCrowd, hai:haiCrowd});
-  });
-}
-
-function renderEveningWithCrowding(data, boardPoint, crowding){
-  // Find all option-card elements and inject crowding bar after opt-subtitle
-  const dash = document.getElementById('dashboard');
-  if(!dash) return;
-
-  // Oxford Circus / Warren Street crowding — relevant board point
-  const boardCrowd = boardPoint==='wrr' ? crowding.wrr : crowding.oxc;
-  const boardLabel = boardPoint==='wrr' ? 'Warren Street' : 'Oxford Circus';
-  const haiCrowd   = crowding.hai;
-
-  // Insert crowding into train card (first card with "Train from H&I" title)
-  const cards = dash.querySelectorAll('.option-card');
-  cards.forEach(card=>{
-    const title = card.querySelector('.opt-title')?.textContent||'';
-    const subtitle = card.querySelector('.opt-subtitle');
-    if(!subtitle) return;
-
-    if(title.includes('Train')){
-      // Show board point crowding + H&I crowding
-      const boardBar = crowdingHtml(boardCrowd, boardLabel);
-      const haiBar   = crowdingHtml(haiCrowd, 'Highbury & Isl.');
-      if(boardBar||haiBar){
-        const div = document.createElement('div');
-        div.innerHTML = (boardBar||'') + (haiBar||'');
-        subtitle.insertAdjacentElement('afterend', div);
+    dash.querySelectorAll('.option-card').forEach(card=>{
+      const title = card.querySelector('.opt-title')?.textContent||'';
+      const subtitle = card.querySelector('.opt-subtitle');
+      if(!subtitle) return;
+      let bars = '';
+      if(title.includes('Train')){
+        bars = (crowdingHtml(boardCrowd, boardLabel)||'') + (crowdingHtml(haiCrowd,'Highbury & Isl.')||'');
+      } else if(title.includes('Tube')){
+        bars = crowdingHtml(boardCrowd, boardLabel)||'';
       }
-    } else if(title.includes('Tube')){
-      // Show board point crowding
-      const boardBar = crowdingHtml(boardCrowd, boardLabel);
-      if(boardBar){
-        const div = document.createElement('div');
-        div.innerHTML = boardBar;
-        subtitle.insertAdjacentElement('afterend', div);
+      if(bars){
+        const div=document.createElement('div');
+        div.innerHTML=bars;
+        subtitle.insertAdjacentElement('afterend',div);
       }
-    }
+    });
   });
 }
 
