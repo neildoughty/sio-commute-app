@@ -305,14 +305,24 @@ async function fetchArrivals(naptanId,lineId,excludeTowards=null){
   const path=lineId?`/StopPoint/${naptanId}/Arrivals?lineIds=${lineId}`:`/StopPoint/${naptanId}/Arrivals`;
   const r=await fetch(tflUrl(path));
   const arr=await r.json();
-  return arr
+  // DEBUG — remove after diagnosing
+  console.log(`[TfL arrivals] ${naptanId} raw count:`, arr.length);
+  if(arr[0]) console.log(`[TfL arrivals] sample fields:`, {
+    lineId:arr[0].lineId, direction:arr[0].direction,
+    towards:arr[0].towards, destinationName:arr[0].destinationName,
+    platformName:arr[0].platformName
+  });
+  const filtered = arr
     .filter(a=>!lineId||a.lineId===lineId)
     .filter(a=>{
       if(!excludeTowards) return true;
-      // excludeTowards is an array of strings — filter OUT arrivals whose destination matches any
       const dest=(a.towards||a.destinationName||'').toLowerCase();
-      return !excludeTowards.some(ex=>dest.includes(ex.toLowerCase()));
-    })
+      const kept = !excludeTowards.some(ex=>dest.includes(ex.toLowerCase()));
+      if(!kept) console.log(`[TfL arrivals] filtered out: towards="${a.towards}" dest="${a.destinationName}"`);
+      return kept;
+    });
+  console.log(`[TfL arrivals] after filter:`, filtered.length);
+  return filtered
     .sort((a,b)=>a.timeToStation-b.timeToStation)
     .slice(0,5)
     .map(a=>{
@@ -463,13 +473,17 @@ async function fetchCrowding(naptanId){
     const day = days[new Date().getDay()];
     // Correct TfL crowding endpoint
     const r = await fetch(tflUrl(`/crowding/${naptanId}/${day}`));
+    console.log(`[TfL crowding] ${naptanId} status:`, r.status);
     if(!r.ok) return null;
     const d = await r.json();
+    console.log(`[TfL crowding] response keys:`, Object.keys(d));
+    console.log(`[TfL crowding] sample:`, JSON.stringify(d).slice(0,300));
     // Response shape: { percentageBaselines: [{timeBand, percentageOfBaseline}] }
     const baselines = d.percentageBaselines || d;
     const hour = new Date().getHours();
     // timeBand is "0600","0700" etc — match current hour
     const padHour = String(hour).padStart(2,'0') + '00';
+    console.log(`[TfL crowding] looking for timeBand:`, padHour, 'in', baselines.slice(0,3).map(b=>b.timeBand));
     const band = baselines.find(b => b.timeBand === padHour)
                || baselines.find(b => parseInt(b.timeBand) === hour * 100)
                || baselines[0];
