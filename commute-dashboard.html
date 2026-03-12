@@ -501,37 +501,9 @@ function crowdingHtml(crowding, label){
 }
 
 
-// TEMP DEBUG — remove after diagnosing Bounds Green
-async function fetchArrivalsDebug(naptanId, lineId){
-  const path=`/StopPoint/${naptanId}/Arrivals`;
-  const r=await fetch(tflUrl(path));
-  const arr=await r.json();
-  const piccOnly = arr.filter(a=>a.lineId===lineId);
-  console.log(`[BND DEBUG] total arrivals: ${arr.length}, piccadilly only: ${piccOnly.length}`);
-  console.log(`[BND DEBUG] all lineIds present:`, [...new Set(arr.map(a=>a.lineId))]);
-  if(piccOnly.length){
-    console.log(`[BND DEBUG] piccadilly samples:`, piccOnly.slice(0,4).map(a=>({
-      towards:a.towards, dest:a.destinationName, dir:a.direction, platform:a.platformName
-    })));
-  } else {
-    console.log(`[BND DEBUG] no piccadilly trains — all samples:`, arr.slice(0,3).map(a=>({
-      lineId:a.lineId, towards:a.towards, dest:a.destinationName
-    })));
-  }
-  return piccOnly
-    .sort((a,b)=>a.timeToStation-b.timeToStation)
-    .slice(0,5)
-    .map(a=>{
-      const mins=Math.round(a.timeToStation/60);
-      const t=new Date(Date.now()+a.timeToStation*1000);
-      const hhmm=`${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}`;
-      return{time:hhmm,mins:minsLabel(Math.max(0,mins)),minsRaw:mins,delayed:false,secsUntil:a.timeToStation};
-    });
-}
-
 // ── STOP IDs ─────────────────────────────────────────────────
 const STOPS={
-  boundsGreen:'940GZZLUBND',  highburyTube:'940GZZLUHAI',
+  boundsGreen:'940GZZLUBDS',  highburyTube:'940GZZLUHAI',
   oxfordCircus:'940GZZLUOXC', warrenStreet:'940GZZLUWRR',
   finsburyPark:'940GZZLUFPK', bowesPark:'910GBOP', highburyRail:'910GHHY',
 };
@@ -666,7 +638,7 @@ async function fetchMorningData(){
     const[piccStatus,vicStatus,piccDeps,darwinDeps,darwinStatus,stnStatuses]=await Promise.all([
       tflReady?fetchLineStatus('piccadilly').catch(()=>MOCK.morning.piccadillyStatus):Promise.resolve(MOCK.morning.piccadillyStatus),
       tflReady?fetchLineStatus('victoria').catch(()=>MOCK.morning.victoriaStatus):Promise.resolve(MOCK.morning.victoriaStatus),
-      tflReady?fetchArrivalsDebug(STOPS.boundsGreen,'piccadilly').catch(()=>null):Promise.resolve(null),
+      tflReady?fetchArrivals(STOPS.boundsGreen,'piccadilly',['Heathrow','Uxbridge','Acton Town','Hammersmith','Rayners Lane','South Harrow']).catch(()=>null):Promise.resolve(null),
       darwinReady?fetchDarwinDepartures(CONFIG.CRS_BOWES_PARK,8,'MOG','to').catch(()=>null):Promise.resolve(null),
       darwinReady?fetchDarwinServiceStatus(CONFIG.CRS_BOWES_PARK).catch(()=>MOCK.morning.trainStatus):Promise.resolve(MOCK.morning.trainStatus),
       tflReady?fetchStationStatuses(stationIds).catch(()=>MOCK.morning.stationStatus):Promise.resolve(MOCK.morning.stationStatus),
