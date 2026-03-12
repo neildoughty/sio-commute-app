@@ -500,6 +500,35 @@ function crowdingHtml(crowding, label){
   </div>`;
 }
 
+
+// TEMP DEBUG — remove after diagnosing Bounds Green
+async function fetchArrivalsDebug(naptanId, lineId){
+  const path=`/StopPoint/${naptanId}/Arrivals`;
+  const r=await fetch(tflUrl(path));
+  const arr=await r.json();
+  const piccOnly = arr.filter(a=>a.lineId===lineId);
+  console.log(`[BND DEBUG] total arrivals: ${arr.length}, piccadilly only: ${piccOnly.length}`);
+  console.log(`[BND DEBUG] all lineIds present:`, [...new Set(arr.map(a=>a.lineId))]);
+  if(piccOnly.length){
+    console.log(`[BND DEBUG] piccadilly samples:`, piccOnly.slice(0,4).map(a=>({
+      towards:a.towards, dest:a.destinationName, dir:a.direction, platform:a.platformName
+    })));
+  } else {
+    console.log(`[BND DEBUG] no piccadilly trains — all samples:`, arr.slice(0,3).map(a=>({
+      lineId:a.lineId, towards:a.towards, dest:a.destinationName
+    })));
+  }
+  return piccOnly
+    .sort((a,b)=>a.timeToStation-b.timeToStation)
+    .slice(0,5)
+    .map(a=>{
+      const mins=Math.round(a.timeToStation/60);
+      const t=new Date(Date.now()+a.timeToStation*1000);
+      const hhmm=`${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}`;
+      return{time:hhmm,mins:minsLabel(Math.max(0,mins)),minsRaw:mins,delayed:false,secsUntil:a.timeToStation};
+    });
+}
+
 // ── STOP IDs ─────────────────────────────────────────────────
 const STOPS={
   boundsGreen:'940GZZLUBND',  highburyTube:'940GZZLUHAI',
@@ -521,11 +550,11 @@ const FOOTBALL_TEAMS={
 };
 
 async function fetchTodayFixtures(){
+  // football-data.org blocks CORS from non-localhost origins on the free tier
+  // so this will silently return nothing when deployed to GitHub Pages
   if(!CONFIG.FOOTBALL_API_KEY) return fetchMockFixtures();
   try{
     const today=new Date().toISOString().split('T')[0];
-    const teamIds=Object.keys(FOOTBALL_TEAMS).join(',');
-    // football-data.org: get today's PL matches for our two teams
     const results=await Promise.all(Object.keys(FOOTBALL_TEAMS).map(async tid=>{
       const r=await fetch(`https://api.football-data.org/v4/teams/${tid}/matches?dateFrom=${today}&dateTo=${today}&status=SCHEDULED,TIMED`,{
         headers:{'X-Auth-Token':CONFIG.FOOTBALL_API_KEY}
@@ -538,7 +567,6 @@ async function fetchTodayFixtures(){
     results.forEach(res=>{
       if(!res) return;
       res.matches.forEach(m=>{
-        // Only home games
         if(m.homeTeam?.id===res.teamId){
           const ko=new Date(m.utcDate);
           const hh=String(ko.getHours()).padStart(2,'0');
@@ -549,7 +577,7 @@ async function fetchTodayFixtures(){
     });
     return games;
   }catch(e){
-    console.warn('Football API error:',e);
+    // CORS failure from GitHub Pages — fail silently, no alert shown
     return [];
   }
 }
@@ -638,7 +666,7 @@ async function fetchMorningData(){
     const[piccStatus,vicStatus,piccDeps,darwinDeps,darwinStatus,stnStatuses]=await Promise.all([
       tflReady?fetchLineStatus('piccadilly').catch(()=>MOCK.morning.piccadillyStatus):Promise.resolve(MOCK.morning.piccadillyStatus),
       tflReady?fetchLineStatus('victoria').catch(()=>MOCK.morning.victoriaStatus):Promise.resolve(MOCK.morning.victoriaStatus),
-      tflReady?fetchArrivals(STOPS.boundsGreen,'piccadilly',['Heathrow','Uxbridge','Acton Town','Hammersmith','Kings Cross','Rayners Lane']).catch(()=>null):Promise.resolve(null),
+      tflReady?fetchArrivalsDebug(STOPS.boundsGreen,'piccadilly').catch(()=>null):Promise.resolve(null),
       darwinReady?fetchDarwinDepartures(CONFIG.CRS_BOWES_PARK,8,'MOG','to').catch(()=>null):Promise.resolve(null),
       darwinReady?fetchDarwinServiceStatus(CONFIG.CRS_BOWES_PARK).catch(()=>MOCK.morning.trainStatus):Promise.resolve(MOCK.morning.trainStatus),
       tflReady?fetchStationStatuses(stationIds).catch(()=>MOCK.morning.stationStatus):Promise.resolve(MOCK.morning.stationStatus),
@@ -1002,6 +1030,31 @@ function renderMorning(data){
 
   // Fetch and inject weather asynchronously so it doesn't block the render
   fetchWeather('morning').then(renderWeatherStrip);
+
+  // Crowding: Bounds Green (tube departure) and Oxford Circus (arrival)
+  Promise.all([
+    fetchCrowding(STOPS.boundsGreen),
+    fetchCrowding(STOPS.oxfordCircus),
+  ]).then(([bndCrowd, oxcCrowd])=>{
+    const dash=document.getElementById('dashboard');
+    if(!dash) return;
+    dash.querySelectorAll('.option-card').forEach(card=>{
+      const title=card.querySelector('.opt-title')?.textContent||'';
+      const subtitle=card.querySelector('.opt-subtitle');
+      if(!subtitle) return;
+      let bars='';
+      if(title.includes('Tube')){
+        bars=(crowdingHtml(bndCrowd,'Bounds Green')||'')+(crowdingHtml(oxcCrowd,'Oxford Circus')||'');
+      } else if(title.includes('Train')){
+        bars=crowdingHtml(oxcCrowd,'Oxford Circus')||'';
+      }
+      if(bars){
+        const div=document.createElement('div');
+        div.innerHTML=bars;
+        subtitle.insertAdjacentElement('afterend',div);
+      }
+    });
+  });
 }
 
 // ── EVENING RENDER ───────────────────────────────────────────
