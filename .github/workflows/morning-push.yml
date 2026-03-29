@@ -1,0 +1,29 @@
+name: Morning commute push
+
+on:
+  schedule:
+    # 7:10am BST (UTC+1) — update to '10 7 * * 1-5' in winter (GMT, late Oct–late Mar)
+    - cron: '10 6 * * 1-5'
+  workflow_dispatch: # Allow manual trigger for testing
+
+jobs:
+  send-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install web-push
+        run: npm install web-push
+
+      - name: Fetch live data and send push
+        env:
+          TFL_API_KEY: ${{ secrets.TFL_API_KEY }}
+          DARWIN_API_KEY: ${{ secrets.DARWIN_API_KEY }}
+          VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          PUSH_SUBSCRIPTION: ${{ secrets.PUSH_SUBSCRIPTION }}
+        run: node .github/scripts/send-push.js
