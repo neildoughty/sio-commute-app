@@ -1243,9 +1243,10 @@ let _swReg = null;
 async function enableNotifications() {
   try {
     const permission = await Notification.requestPermission();
-    if (permission === 'granted' && _swReg) {
-      const sub = await _swReg.pushManager.getSubscription()
-        || await _swReg.pushManager.subscribe({
+    if (permission === 'granted') {
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription()
+        || await reg.pushManager.subscribe({
           userVisibleOnly: true,
           applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
         });
