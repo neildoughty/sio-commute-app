@@ -37,9 +37,10 @@ async function getTflLine(line) {
   } catch { return 'Unknown'; }
 }
 
-async function getNextTrain(crs) {
+async function getNextTrain(crs, dest = null) {
   try {
-    const res = await fetch(`https://huxley2.azurewebsites.net/departures/${crs}/5?accessToken=${DARWIN_KEY}`);
+    const path = dest ? `${crs}/to/${dest}/5` : `${crs}/5`;
+    const res = await fetch(`https://huxley2.azurewebsites.net/departures/${path}?accessToken=${DARWIN_KEY}`);
     const data = await res.json();
     const next = (data.trainServices || [])[0];
     if (!next) return 'No trains found';
@@ -58,11 +59,12 @@ async function morning() {
 }
 
 async function evening() {
-  const [train, victoria] = await Promise.all([
-    getNextTrain('HHY'),
+  const [train, victoria, piccadilly] = await Promise.all([
+    getNextTrain('HHY', 'BOP'),
     getTflLine('victoria'),
+    getTflLine('piccadilly'),
   ]);
-  return { title: 'Head for home', body: `${train} · Victoria: ${victoria}` };
+  return { title: 'Head for home', body: `Overground: ${train} · Vic: ${victoria} · Pic: ${piccadilly}` };
 }
 
 // ── Main ──────────────────────────────────────────────────────
