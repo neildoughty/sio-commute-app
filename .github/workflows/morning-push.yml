@@ -7,6 +7,11 @@ on:
     - cron: '45 16 * * 1-5'  # 5:45pm BST (summer, UTC+1)
     - cron: '45 17 * * 1-5'  # 5:45pm GMT (winter, UTC+0)
   workflow_dispatch:
+    inputs:
+      force_type:
+        description: 'Force notification type (morning or evening)'
+        required: false
+        default: ''
 
 jobs:
   send-push:
@@ -28,4 +33,5 @@ jobs:
           VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
           VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
           PUSH_SUBSCRIPTION: ${{ secrets.PUSH_SUBSCRIPTION }}
+          FORCE_TYPE: ${{ github.event.inputs.force_type }}
         run: node .github/scripts/send-push.js
