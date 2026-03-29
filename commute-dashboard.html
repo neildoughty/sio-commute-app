@@ -1241,6 +1241,7 @@ function urlBase64ToUint8Array(b64) {
 let _swReg = null;
 
 async function enableNotifications() {
+  console.log('enableNotifications called');
   try {
     const permission = await Notification.requestPermission();
     if (permission === 'granted') {
