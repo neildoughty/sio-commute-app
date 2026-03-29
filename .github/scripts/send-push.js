@@ -1,4 +1,4 @@
-// Morning commute push — fetches live data then sends Web Push
+// Commute push notifications — morning and evening
 const webpush = require('web-push');
 
 const APP_URL = 'https://neildoughty.github.io/sio-commute-app/commute-dashboard.html';
@@ -6,51 +6,82 @@ const TFL_KEY = process.env.TFL_API_KEY;
 const DARWIN_KEY = process.env.DARWIN_API_KEY;
 
 webpush.setVapidDetails(
-  'mailto:neil@neildoughty.com', // update if needed
+  'mailto:neil@neildoughty.com',
   process.env.VAPID_PUBLIC_KEY,
   process.env.VAPID_PRIVATE_KEY
 );
 
-async function getTrain() {
-  try {
-    const res = await fetch(
-      `https://huxley2.azurewebsites.net/departures/BOP/5?accessToken=${DARWIN_KEY}`
-    );
-    const data = await res.json();
-    const services = data.trainServices || [];
-    if (!services.length) return 'No trains found';
-
-    const next = services[0];
-    const time = next.std || '?';
-    const eta  = next.etd === 'On time' ? 'on time' : (next.etd || 'check app');
-    return `${time} ${eta}`;
-  } catch {
-    return 'Check app for trains';
-  }
+// ── UK time helpers (handles BST/GMT automatically) ───────────
+function isUKSummerTime(date) {
+  const y = date.getUTCFullYear();
+  const lastSunMar = new Date(Date.UTC(y, 2, 31));
+  lastSunMar.setUTCDate(31 - lastSunMar.getUTCDay());
+  const lastSunOct = new Date(Date.UTC(y, 9, 31));
+  lastSunOct.setUTCDate(31 - lastSunOct.getUTCDay());
+  const bstStart  = new Date(lastSunMar.getTime() + 3600000); // 1am UTC
+  const gmtReturn = new Date(lastSunOct.getTime() + 3600000); // 1am UTC
+  return date >= bstStart && date < gmtReturn;
 }
 
-async function getPiccadillyStatus() {
+function ukTime(date) {
+  const offset = isUKSummerTime(date) ? 1 : 0;
+  return { hour: (date.getUTCHours() + offset) % 24, minute: date.getUTCMinutes() };
+}
+
+// ── Data fetchers ─────────────────────────────────────────────
+async function getTflLine(line) {
   try {
-    const res = await fetch(
-      `https://api.tfl.gov.uk/Line/piccadilly/Status?app_key=${TFL_KEY}`
-    );
+    const res = await fetch(`https://api.tfl.gov.uk/Line/${line}/Status?app_key=${TFL_KEY}`);
     const data = await res.json();
     return data[0]?.lineStatuses[0]?.statusSeverityDescription || 'Unknown';
-  } catch {
-    return 'Unknown';
-  }
+  } catch { return 'Unknown'; }
 }
 
+async function getNextTrain(crs) {
+  try {
+    const res = await fetch(`https://huxley2.azurewebsites.net/departures/${crs}/5?accessToken=${DARWIN_KEY}`);
+    const data = await res.json();
+    const next = (data.trainServices || [])[0];
+    if (!next) return 'No trains found';
+    const eta = next.etd === 'On time' ? 'on time' : (next.etd || 'check app');
+    return `${next.std} ${eta}`;
+  } catch { return 'Check app for trains'; }
+}
+
+// ── Notification builders ─────────────────────────────────────
+async function morning() {
+  const [train, piccadilly] = await Promise.all([
+    getNextTrain('BOP'),
+    getTflLine('piccadilly'),
+  ]);
+  return { title: 'Time to leave', body: `${train} · Piccadilly: ${piccadilly}` };
+}
+
+async function evening() {
+  const [train, victoria] = await Promise.all([
+    getNextTrain('HHY'),
+    getTflLine('victoria'),
+  ]);
+  return { title: 'Head for home', body: `${train} · Victoria: ${victoria}` };
+}
+
+// ── Main ──────────────────────────────────────────────────────
 async function main() {
-  const [train, piccadilly] = await Promise.all([getTrain(), getPiccadillyStatus()]);
+  const now = new Date();
+  const { hour, minute } = ukTime(now);
+  const hhmm = `${hour}:${String(minute).padStart(2, '0')}`;
 
-  const title = 'Time to leave';
-  const body  = `${train} · Piccadilly: ${piccadilly}`;
+  let payload;
+  if      (hour === 7  && minute === 10) payload = await morning();
+  else if (hour === 17 && minute === 45) payload = await evening();
+  else {
+    console.log(`Not a scheduled UK time (currently ${hhmm}). Skipping.`);
+    process.exit(0);
+  }
 
-  console.log(`Sending: "${title}" — ${body}`);
-
+  console.log(`Sending [${hhmm} UK]: "${payload.title}" — ${payload.body}`);
   const subscription = JSON.parse(process.env.PUSH_SUBSCRIPTION);
-  await webpush.sendNotification(subscription, JSON.stringify({ title, body, url: APP_URL }));
+  await webpush.sendNotification(subscription, JSON.stringify({ ...payload, url: APP_URL }));
   console.log('Push sent.');
 }
 
