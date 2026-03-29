@@ -59,3 +59,22 @@ self.addEventListener('fetch', e => {
     })
   );
 });
+
+// ── PUSH NOTIFICATIONS ────────────────────────────────────────
+self.addEventListener('push', e => {
+  const data = e.data ? e.data.json() : {};
+  const title = data.title || 'Commute update';
+  const options = {
+    body: data.body || 'Check your commute',
+    icon: '/icons/icon-192.png',
+    badge: '/icons/icon-192.png',
+    data: { url: data.url || '/commute-dashboard.html' },
+    vibrate: [200, 100, 200],
+  };
+  e.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  e.waitUntil(clients.openWindow(e.notification.data.url));
+});
