@@ -1,9 +1,9 @@
 {
-  "name": "Commute · London",
+  "name": "Commute \u00b7 London",
   "short_name": "Commute",
-  "description": "Live North London commute dashboard — tube, train, and football alerts",
-  "start_url": "/commute-dashboard.html",
-  "scope": "/",
+  "description": "Live North London commute dashboard \u2014 tube, train, and football alerts",
+  "start_url": "/sio-commute-app/commute-dashboard.html",
+  "scope": "/sio-commute-app/",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#0b0d14",
