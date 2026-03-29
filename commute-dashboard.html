@@ -1246,9 +1246,9 @@ async function enableNotifications() {
     const permission = await Notification.requestPermission();
     console.log('permission:', permission);
     if (permission === 'granted') {
-      console.log('waiting for SW ready...');
-      const reg = await navigator.serviceWorker.ready;
-      console.log('SW ready, subscribing...');
+      console.log('getting SW registration...');
+      const reg = _swReg || await navigator.serviceWorker.getRegistration();
+      console.log('got reg:', reg);
       const sub = await reg.pushManager.getSubscription()
         || await reg.pushManager.subscribe({
           userVisibleOnly: true,
