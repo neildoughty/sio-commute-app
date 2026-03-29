@@ -60,11 +60,11 @@ async function morning() {
 
 async function evening() {
   const [train, victoria, piccadilly] = await Promise.all([
-    getNextTrain('HHY', 'BOP'),
+    getNextTrain('HHY'),
     getTflLine('victoria'),
     getTflLine('piccadilly'),
   ]);
-  return { title: 'Head for home', body: `Overground: ${train} · Vic: ${victoria} · Pic: ${piccadilly}` };
+  return { title: 'Head for home', body: `Vic: ${victoria} · Pic: ${piccadilly} · Overground: ${train}` };
 }
 
 // ── Main ──────────────────────────────────────────────────────
