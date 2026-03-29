@@ -1244,13 +1244,17 @@ async function enableNotifications() {
   console.log('enableNotifications called');
   try {
     const permission = await Notification.requestPermission();
+    console.log('permission:', permission);
     if (permission === 'granted') {
+      console.log('waiting for SW ready...');
       const reg = await navigator.serviceWorker.ready;
+      console.log('SW ready, subscribing...');
       const sub = await reg.pushManager.getSubscription()
         || await reg.pushManager.subscribe({
           userVisibleOnly: true,
           applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
         });
+      console.log('subscribed!');
       console.log('%cPUSH_SUBSCRIPTION (copy into GitHub Secrets):', 'color: lime; font-weight: bold');
       console.log(JSON.stringify(sub));
       const btn = document.getElementById('notif-btn');
