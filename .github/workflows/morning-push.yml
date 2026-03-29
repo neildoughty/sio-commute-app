@@ -1,10 +1,12 @@
-name: Morning commute push
+name: Commute push notifications
 
 on:
   schedule:
-    # 7:10am BST (UTC+1) — update to '10 7 * * 1-5' in winter (GMT, late Oct–late Mar)
-    - cron: '10 6 * * 1-5'
-  workflow_dispatch: # Allow manual trigger for testing
+    - cron: '10 6 * * 1-5'   # 7:10am BST (summer, UTC+1)
+    - cron: '10 7 * * 1-5'   # 7:10am GMT (winter, UTC+0)
+    - cron: '45 16 * * 1-5'  # 5:45pm BST (summer, UTC+1)
+    - cron: '45 17 * * 1-5'  # 5:45pm GMT (winter, UTC+0)
+  workflow_dispatch:
 
 jobs:
   send-push:
@@ -19,7 +21,7 @@ jobs:
       - name: Install web-push
         run: npm install web-push
 
-      - name: Fetch live data and send push
+      - name: Send push notification
         env:
           TFL_API_KEY: ${{ secrets.TFL_API_KEY }}
           DARWIN_API_KEY: ${{ secrets.DARWIN_API_KEY }}
