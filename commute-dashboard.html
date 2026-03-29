@@ -38,7 +38,8 @@ h1 em{font-style:normal;color:var(--accent);}
 .header-right{text-align:right;flex-shrink:0;padding-top:2px;}
 .clock-time{font-family:'DM Mono',monospace;font-size:26px;color:var(--head);letter-spacing:-0.02em;line-height:1;}
 .clock-date{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);margin-top:4px;letter-spacing:0.04em;}
-.notif-btn{background:none;border:1px solid var(--border);border-radius:7px;color:var(--muted);font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.06em;padding:4px 8px;cursor:pointer;margin-top:7px;display:block;width:100%;text-align:center;}
+.header-middle{display:flex;align-items:center;justify-content:center;flex:1;padding:0 12px;}
+.notif-btn{background:none;border:1px solid var(--border);border-radius:7px;color:var(--muted);font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.06em;padding:5px 10px;cursor:pointer;white-space:nowrap;}
 .notif-btn.enabled{color:var(--green);border-color:var(--green);}
 
 .direction-toggle{display:flex;gap:6px;margin-bottom:22px;}
@@ -207,10 +208,12 @@ body.evening .football-alert.spurs{border-color:rgba(19,34,87,0.25);background:r
     <div class="eyebrow">Commute · London</div>
     <h1 id="header-title">To <em>Work</em></h1>
   </div>
+  <div class="header-middle">
+    <button class="notif-btn" id="notif-btn" onclick="enableNotifications()">🔔 Enable alerts</button>
+  </div>
   <div class="header-right">
     <div class="clock-time" id="clock-time">--:--</div>
     <div class="clock-date" id="clock-date">---</div>
-    <button class="notif-btn" id="notif-btn" onclick="enableNotifications()">🔔 Enable alerts</button>
   </div>
 </div>
 
@@ -1241,22 +1244,15 @@ function urlBase64ToUint8Array(b64) {
 let _swReg = null;
 
 async function enableNotifications() {
-  console.log('enableNotifications called');
   try {
     const permission = await Notification.requestPermission();
-    console.log('permission:', permission);
     if (permission === 'granted') {
-      console.log('getting SW registration...');
       const reg = _swReg || await navigator.serviceWorker.getRegistration();
-      console.log('got reg:', reg);
       const sub = await reg.pushManager.getSubscription()
         || await reg.pushManager.subscribe({
           userVisibleOnly: true,
           applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
         });
-      console.log('subscribed!');
-      console.log('%cPUSH_SUBSCRIPTION (copy into GitHub Secrets):', 'color: lime; font-weight: bold');
-      console.log(JSON.stringify(sub));
       const btn = document.getElementById('notif-btn');
       btn.textContent = '🔔 Alerts on';
       btn.classList.add('enabled');
