@@ -71,9 +71,11 @@ async function main() {
   const { hour, minute } = ukTime(now);
   const hhmm = `${hour}:${String(minute).padStart(2, '0')}`;
 
+  // FORCE_TYPE env var allows manual testing: set to 'morning' or 'evening'
+  const force = process.env.FORCE_TYPE;
   let payload;
-  if      (hour === 7  && minute === 10) payload = await morning();
-  else if (hour === 17 && minute === 45) payload = await evening();
+  if      (force === 'morning' || (!force && hour === 7  && minute === 10)) payload = await morning();
+  else if (force === 'evening' || (!force && hour === 17 && minute === 45)) payload = await evening();
   else {
     console.log(`Not a scheduled UK time (currently ${hhmm}). Skipping.`);
     process.exit(0);
