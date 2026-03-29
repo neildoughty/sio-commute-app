@@ -1,12 +1,12 @@
 // Commute Dashboard — Service Worker
-const CACHE = 'commute-v2';
+const CACHE = 'commute-v3';
 const PRECACHE = [
-  '/commute-dashboard.html',
-  '/config.js',
-  '/manifest.json',
-  '/icons/icon-192.png',
-  '/icons/icon-512.png',
-  '/icons/apple-touch-icon.png',
+  '/sio-commute-app/commute-dashboard.html',
+  '/sio-commute-app/config.js',
+  '/sio-commute-app/manifest.json',
+  '/sio-commute-app/icons/icon-192.png',
+  '/sio-commute-app/icons/icon-512.png',
+  '/sio-commute-app/icons/apple-touch-icon.png',
 ];
 
 // On install: cache all static assets
