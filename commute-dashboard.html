@@ -1226,12 +1226,35 @@ function updateClock(){
   loadAndRender();
 })();
 
-// ── SERVICE WORKER REGISTRATION ──────────────────────────────
-if('serviceWorker' in navigator){
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js')
-      .then(r => console.log('SW registered:', r.scope))
-      .catch(e => console.warn('SW failed:', e));
+// ── SERVICE WORKER + PUSH SUBSCRIPTION ───────────────────────
+const VAPID_PUBLIC_KEY = 'BJx1SZfKJt5oOGj72H-ySU6DxZ7Z5CrZuzCvRXV7IhNGXE0WbmdAtwNwnIGyO_Yv3EMT4BRvVJhEJs6iwdqle44';
+
+function urlBase64ToUint8Array(b64) {
+  const padding = '='.repeat((4 - b64.length % 4) % 4);
+  const base64 = (b64 + padding).replace(/-/g, '+').replace(/_/g, '/');
+  return Uint8Array.from([...atob(base64)].map(c => c.charCodeAt(0)));
+}
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', async () => {
+    try {
+      const reg = await navigator.serviceWorker.register('sw.js');
+      console.log('SW registered:', reg.scope);
+
+      const permission = await Notification.requestPermission();
+      if (permission === 'granted') {
+        const sub = await reg.pushManager.getSubscription()
+          || await reg.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+          });
+        // Open browser console and copy this value into GitHub Secrets as PUSH_SUBSCRIPTION
+        console.log('%cPUSH_SUBSCRIPTION (copy into GitHub Secrets):', 'color: lime; font-weight: bold');
+        console.log(JSON.stringify(sub));
+      }
+    } catch (e) {
+      console.warn('SW/push setup failed:', e);
+    }
   });
 }
 </script>
