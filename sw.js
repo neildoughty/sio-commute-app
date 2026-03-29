@@ -1,5 +1,5 @@
 // Commute Dashboard — Service Worker
-const CACHE = 'commute-v1';
+const CACHE = 'commute-v2';
 const PRECACHE = [
   '/commute-dashboard.html',
   '/config.js',
