@@ -238,6 +238,7 @@ body.evening .football-alert.spurs{border-color:rgba(19,34,87,0.25);background:r
   <div class="board-toggle">
     <button class="board-btn active" id="board-oxc" onclick="setBoardPoint('oxc')">Oxford Circus</button>
     <button class="board-btn" id="board-wrr" onclick="setBoardPoint('wrr')">Warren Street</button>
+    <button class="board-btn" id="board-gps" onclick="setBoardPoint('gps')">Gt Portland St</button>
   </div>
 </div>
 
@@ -512,11 +513,12 @@ const STOPS={
   boundsGreen:'940GZZLUBDS',  highburyTube:'940GZZLUHAI',
   oxfordCircus:'940GZZLUOXC', warrenStreet:'940GZZLUWRR',
   finsburyPark:'940GZZLUFPK', bowesPark:'910GBOP', highburyRail:'910GHHY',
+  greatPortlandSt:'940GZZLUGPS', kingsCross:'940GZZLUKSX',
 };
 
 // ride time (mins) from each board point to Highbury & Islington
 const RIDE_TO_HAI={ oxc:8, wrr:6 };   // tube ride mins to H&I
-const WALK_TO_STN={ oxc:CONFIG.WALK_TO_OXC||5, wrr:CONFIG.WALK_TO_WRR||11 };  // from config.js
+const WALK_TO_STN={ oxc:CONFIG.WALK_TO_OXC||5, wrr:CONFIG.WALK_TO_WRR||11, gps:2 };  // from config.js
 const WALK_AT_HAI=2; // platform change buffer at H&I
 
 
@@ -666,15 +668,17 @@ async function fetchEveningData(){
   if(!tflReady&&!darwinReady) return{
     piccadillyStatus:MOCK.evening.piccadillyStatus,
     victoriaStatus:MOCK.evening.victoriaStatus,
+    circleStatus:null,
     trainStatus:MOCK.evening.trainStatus,
     victoriaDepsFP:null, victoriaWrr:null, trainDepsHAI:null,
     stationStatus:MOCK.evening.stationStatus
   };
   try{
-    const stationIds=[STOPS.oxfordCircus,STOPS.warrenStreet,STOPS.highburyTube,STOPS.finsburyPark];
-    const[piccStatus,vicStatus,vicDepsFP,vicDepsWrr,darwinDeps,darwinStatus,stnStatuses]=await Promise.all([
+    const stationIds=[STOPS.oxfordCircus,STOPS.warrenStreet,STOPS.highburyTube,STOPS.finsburyPark,STOPS.greatPortlandSt,STOPS.kingsCross];
+    const[piccStatus,vicStatus,circStatus,vicDepsFP,vicDepsWrr,darwinDeps,darwinStatus,stnStatuses]=await Promise.all([
       tflReady?fetchLineStatus('piccadilly').catch(()=>MOCK.evening.piccadillyStatus):Promise.resolve(MOCK.evening.piccadillyStatus),
       tflReady?fetchLineStatus('victoria').catch(()=>MOCK.evening.victoriaStatus):Promise.resolve(MOCK.evening.victoriaStatus),
+      tflReady?fetchLineStatus('circle').catch(()=>null):Promise.resolve(null),
       tflReady?fetchArrivals(STOPS.finsburyPark,'victoria',['Walthamstow','Seven Sisters','Blackhorse']).catch(()=>null):Promise.resolve(null),
       tflReady?fetchArrivals(STOPS.warrenStreet,'victoria',['Walthamstow','Seven Sisters','Blackhorse']).catch(()=>null):Promise.resolve(null),
       darwinReady?fetchDarwinDepartures(CONFIG.CRS_HIGHBURY,8,CONFIG.CRS_BOWES_PARK,'to').catch(()=>null):Promise.resolve(null),
@@ -684,6 +688,7 @@ async function fetchEveningData(){
     return{
       piccadillyStatus:piccStatus||MOCK.evening.piccadillyStatus,
       victoriaStatus:vicStatus||MOCK.evening.victoriaStatus,
+      circleStatus:circStatus||null,
       trainStatus:darwinStatus||MOCK.evening.trainStatus,
       victoriaDepsFP:vicDepsFP?.length?vicDepsFP:null,
       victoriaWrr:vicDepsWrr?.length?vicDepsWrr:null,
@@ -728,7 +733,7 @@ function morningRec(data){
 }
 
 function eveningRec(data,boardPoint){
-  const{piccadillyStatus,victoriaStatus,trainStatus,trainDepsHAI,stationStatus}=data;
+  const{piccadillyStatus,victoriaStatus,circleStatus,trainStatus,trainDepsHAI,stationStatus}=data;
   const connections=analyseConnections(trainDepsHAI,boardPoint);
   const bestConn=connections.find(c=>c.canMake);
   const trainOk=trainStatus?.ok!==false;
@@ -736,6 +741,23 @@ function eveningRec(data,boardPoint){
   const oxStatus=stationStatus?.[STOPS.oxfordCircus]||'unknown';
   const oxClosed=oxStatus==='closed';
   const oxBusy=oxStatus==='partClosed';
+
+  if(boardPoint==='gps'){
+    const circOk=circleStatus?.ok!==false;
+    const piccOk=piccadillyStatus.ok;
+    if(!circOk&&!piccOk) return{option:'gps',level:'bad',
+      headline:'Disruption on both lines — check app',
+      reason:'Issues reported on both Circle/H&C and Piccadilly lines.'};
+    if(!circOk) return{option:'gps',level:'warn',
+      headline:'Circle/H&C disruption — allow extra time',
+      reason:circleStatus?.reason||`Circle/H&C: ${circleStatus?.text||'delays reported'}`};
+    if(!piccOk) return{option:'gps',level:'warn',
+      headline:'Piccadilly disruption — check app',
+      reason:piccadillyStatus.reason||`Piccadilly: ${piccadillyStatus.text}`};
+    return{option:'gps',level:'good',
+      headline:'Good to go via King\'s Cross',
+      reason:'Circle/H&C and Piccadilly lines running normally.'};
+  }
 
   if(oxClosed) return{option:'warren',level:'bad',
     headline:'Oxford Circus closed — board at Warren Street',
@@ -1039,7 +1061,7 @@ function renderMorning(data){
 function renderEvening(data,boardPoint){
   if(countdownInterval){clearInterval(countdownInterval);countdownInterval=null;}
   const rec=eveningRec(data,boardPoint);
-  const{piccadillyStatus,victoriaStatus,trainStatus,victoriaDepsFP,victoriaWrr,trainDepsHAI,stationStatus}=data;
+  const{piccadillyStatus,victoriaStatus,circleStatus,trainStatus,victoriaDepsFP,victoriaWrr,trainDepsHAI,stationStatus}=data;
   const connections=analyseConnections(trainDepsHAI,boardPoint);
   const bestConn=connections.find(c=>c.canMake);
   const makeable=!!bestConn;
@@ -1110,6 +1132,36 @@ function renderEvening(data,boardPoint){
     return c;
   }
 
+  // GPS route — completely separate render path, no H&I train logic
+  if(boardPoint==='gps'){
+    function cardGPS(){
+      const gpsRec=rec.option==='gps';
+      let c=`<div class="option-card ${gpsRec?'recommended':''}">
+        ${gpsRec?'<div class="rec-badge">✓ Recommended</div>':''}
+        <div class="opt-title">Circle line via King's Cross</div>
+        <div class="opt-subtitle">Gt Portland St → King's Cross → Piccadilly → Bounds Green</div>`;
+      c+=rStatus([
+        {label:'Circle/H&C',ok:circleStatus?.ok!==false,text:circleStatus?.text||'Good service'},
+        {label:'Piccadilly',ok:piccadillyStatus.ok,text:piccadillyStatus.text}
+      ]);
+      if(circleStatus&&!circleStatus.ok&&circleStatus.reason) c+=`<div class="disruption"><strong>⚠ Disruption</strong>${circleStatus.reason}</div>`;
+      if(!piccadillyStatus.ok&&piccadillyStatus.reason) c+=`<div class="disruption"><strong>⚠ Disruption</strong>${piccadillyStatus.reason}</div>`;
+      c+=`<div class="legs">
+        ${rLeg('#F3A9BB','Circle / H&C','Gt Portland St',STOPS.greatPortlandSt,"King's Cross",STOPS.kingsCross,'5 min',stationStatus)}
+        ${rChange("Change at King's Cross St. Pancras")}
+        ${rLeg('#4a7fff','Piccadilly line',"King's Cross",STOPS.kingsCross,'Bounds Green',STOPS.boundsGreen,'12 min',stationStatus)}
+      </div>`;
+      c+=rStats(21,2,gpsRec?80:65);
+      c+=`</div>`;
+      return c;
+    }
+    html+=`<div class="section-label">Your options</div>`;
+    html+=cardGPS();
+    document.getElementById('dashboard').innerHTML=html;
+    fetchWeather('evening_oxc').then(renderWeatherStrip);
+    return;
+  }
+
   // Render recommended option first — countdown travels with the train card
   if(finRec){
     html+=`<div class="section-label">Your options</div>`;
@@ -1129,7 +1181,7 @@ function renderEvening(data,boardPoint){
   if(connections.length) startCountdownTick(connections, boardPoint);
 
   // Weather at the board point
-  const weatherLoc = boardPoint==='wrr' ? 'evening_wrr' : 'evening_oxc';
+  const weatherLoc = boardPoint==='wrr' ? 'evening_wrr' : 'evening_oxc'; // gps handled above
   fetchWeather(weatherLoc).then(renderWeatherStrip);
 
   // Crowding: fetch after render so it doesn't block the panel
@@ -1170,6 +1222,7 @@ function setBoardPoint(bp){
   boardPoint=bp;
   document.getElementById('board-oxc').classList.toggle('active',bp==='oxc');
   document.getElementById('board-wrr').classList.toggle('active',bp==='wrr');
+  document.getElementById('board-gps').classList.toggle('active',bp==='gps');
   if(lastEveningData) renderEvening(lastEveningData, boardPoint);
 }
 
