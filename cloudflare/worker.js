@@ -144,11 +144,6 @@ export default {
     try {
       if (path === '/test/morning') { await sendPush(env, await morning(env)); return new Response('Morning sent'); }
       if (path === '/test/evening') { await sendPush(env, await evening(env)); return new Response('Evening sent'); }
-      if (path === '/debug') {
-        const s = env.PUSH_SUBSCRIPTION || '';
-        const codes = [...s.slice(0,6)].map(c => c.charCodeAt(0));
-        return new Response(`len=${s.length} chars=[${codes.join(',')}]`);
-      }
       return new Response('Commute push worker — running');
     } catch (e) {
       return new Response(e.message, { status: 500 });
