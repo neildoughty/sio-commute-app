@@ -1,0 +1,36 @@
+name: Deploy Cloudflare Worker
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'cloudflare/**'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Wrangler
+        run: npm install -g wrangler@latest
+
+      - name: Set Worker secrets
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+        working-directory: cloudflare
+        run: |
+          echo "${{ secrets.VAPID_PUBLIC_KEY }}"  | wrangler secret put VAPID_PUBLIC_KEY  --name sio-commute-push
+          echo "${{ secrets.VAPID_PRIVATE_KEY }}" | wrangler secret put VAPID_PRIVATE_KEY --name sio-commute-push
+          echo "${{ secrets.PUSH_SUBSCRIPTION }}" | wrangler secret put PUSH_SUBSCRIPTION --name sio-commute-push
+          echo "${{ secrets.TFL_API_KEY }}"       | wrangler secret put TFL_API_KEY       --name sio-commute-push
+          echo "${{ secrets.DARWIN_API_KEY }}"    | wrangler secret put DARWIN_API_KEY    --name sio-commute-push
+
+      - name: Deploy Worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+        working-directory: cloudflare
+        run: wrangler deploy
