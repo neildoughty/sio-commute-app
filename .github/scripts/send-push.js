@@ -74,12 +74,13 @@ async function main() {
   const hhmm = `${hour}:${String(minute).padStart(2, '0')}`;
 
   // FORCE_TYPE env var allows manual testing: set to 'morning' or 'evening'
+  // Hour-only check gives ~55 min tolerance for GitHub Actions scheduling delays
   const force = process.env.FORCE_TYPE;
   let payload;
-  if      (force === 'morning' || (!force && hour === 7  && minute === 10)) payload = await morning();
-  else if (force === 'evening' || (!force && hour === 17 && minute === 45)) payload = await evening();
+  if      (force === 'morning' || (!force && hour === 7))  payload = await morning();
+  else if (force === 'evening' || (!force && hour === 17)) payload = await evening();
   else {
-    console.log(`Not a scheduled UK time (currently ${hhmm}). Skipping.`);
+    console.log(`Not a scheduled UK hour (currently ${hhmm}). Skipping.`);
     process.exit(0);
   }
 
