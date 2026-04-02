@@ -1,0 +1,11 @@
+name = "sio-commute-push"
+main = "worker.js"
+compatibility_date = "2025-01-01"
+
+[triggers]
+crons = [
+  "10 6 * * 1-5",   # 7:10am BST (summer)
+  "10 7 * * 1-5",   # 7:10am GMT (winter)
+  "45 16 * * 1-5",  # 5:45pm BST (summer)
+  "45 17 * * 1-5",  # 5:45pm GMT (winter)
+]
