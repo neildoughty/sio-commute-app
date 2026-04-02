@@ -59,11 +59,12 @@ async function morning() {
 }
 
 async function evening() {
-  const [victoria, piccadilly] = await Promise.all([
+  const [victoria, piccadilly, circle] = await Promise.all([
     getTflLine('victoria'),
     getTflLine('piccadilly'),
+    getTflLine('circle'),
   ]);
-  return { title: 'Head for home', body: `Victoria: ${victoria} · Piccadilly: ${piccadilly}` };
+  return { title: 'Head for home', body: `Vic: ${victoria} · Pic: ${piccadilly} · Circle: ${circle}` };
 }
 
 // ── Main ──────────────────────────────────────────────────────
