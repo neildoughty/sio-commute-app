@@ -76,7 +76,7 @@ async function encrypt(payload, sub) {
 
 // ── Send push ──────────────────────────────────────────────────
 async function sendPush(env, data) {
-  const sub  = JSON.parse(env.PUSH_SUBSCRIPTION);
+  const sub  = JSON.parse(env.PUSH_SUBSCRIPTION.trim());
   const body = await encrypt(JSON.stringify({ ...data, url: APP_URL }), sub);
   const jwt  = await vapidJWT(sub.endpoint, env.VAPID_PUBLIC_KEY, env.VAPID_PRIVATE_KEY);
   const res  = await fetch(sub.endpoint, {
