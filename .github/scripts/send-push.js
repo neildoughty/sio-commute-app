@@ -37,34 +37,38 @@ async function getTflLine(line) {
   } catch { return 'Unknown'; }
 }
 
-async function getNextTrain(crs, dest = null) {
+const MORNING_TARGET = '07:25';
+
+async function getNextTrain(crs) {
   try {
-    const path = dest ? `${crs}/to/${dest}/5` : `${crs}/5`;
-    const res = await fetch(`https://huxley2.azurewebsites.net/departures/${path}?accessToken=${DARWIN_KEY}`);
+    const res = await fetch(`https://huxley2.azurewebsites.net/departures/${crs}/10?accessToken=${DARWIN_KEY}`);
     const data = await res.json();
-    const next = (data.trainServices || [])[0];
-    if (!next) return 'No trains found';
-    const eta = next.etd === 'On time' ? 'on time' : (next.etd || 'check app');
-    return `${next.std} ${eta}`;
+    const services = data.trainServices || [];
+    // For morning from BOP, prefer the target train; otherwise fall back to next departure
+    const svc = services.find(s => s.std === MORNING_TARGET) || services[0];
+    if (!svc) return 'No trains found';
+    const eta = svc.isCancelled ? 'CANCELLED' : (svc.etd === 'On time' ? 'on time' : (svc.etd || 'check app'));
+    return `${svc.std} ${eta}`;
   } catch { return 'Check app for trains'; }
 }
 
 // ── Notification builders ─────────────────────────────────────
 async function morning() {
-  const [train, piccadilly] = await Promise.all([
+  const [train, piccadilly, victoria] = await Promise.all([
     getNextTrain('BOP'),
     getTflLine('piccadilly'),
+    getTflLine('victoria'),
   ]);
-  return { title: 'Time to leave', body: `${train} · Piccadilly: ${piccadilly}` };
+  return { title: 'Time to leave', body: `${train} · Pic: ${piccadilly} · Vic: ${victoria}` };
 }
 
 async function evening() {
-  const [victoria, piccadilly, circle] = await Promise.all([
+  const [train, victoria, piccadilly] = await Promise.all([
+    getNextTrain('HHY'),
     getTflLine('victoria'),
     getTflLine('piccadilly'),
-    getTflLine('circle'),
   ]);
-  return { title: 'Head for home', body: `Vic: ${victoria} · Pic: ${piccadilly} · Circle: ${circle}` };
+  return { title: 'Head for home', body: `${train} · Vic: ${victoria} · Pic: ${piccadilly}` };
 }
 
 // ── Main ──────────────────────────────────────────────────────
